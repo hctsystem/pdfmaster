@@ -206,7 +206,7 @@ export default function DeveloperModal() {
                   }}
                 >
                   <img 
-                    src="/gcashqr.png" 
+                    src="/gcashqr.jpg" 
                     alt="GCash QR Code" 
                     onError={(e) => {
                       // Fallback placeholder if image not uploaded yet
@@ -218,7 +218,7 @@ export default function DeveloperModal() {
                         placeholder.style.fontSize = '0.75rem';
                         placeholder.style.textAlign = 'center';
                         placeholder.style.padding = '1rem';
-                        placeholder.innerHTML = '<strong>[GCash QR Placeholder]</strong><br/>Upload gcashqr.png to your public folder';
+                        placeholder.innerHTML = '<strong>[GCash QR Placeholder]</strong><br/>Upload gcashqr.jpg to your public folder';
                         parent.appendChild(placeholder);
                       }
                     }}
