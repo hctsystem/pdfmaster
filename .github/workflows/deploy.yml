@@ -53,3 +53,30 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Send Email on Failure
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.MAIL_SERVER }}
+          server_port: 465
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "❌ PDFMaster Deployment Failed"
+          to: ${{ secrets.NOTIFICATION_EMAIL }}
+          from: GitHub Actions <no-reply@github.com>
+          body: "The PDFMaster deployment has failed for commit ${{ github.sha }}. Check the actions run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+      - name: Send Email on Success
+        if: success()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.MAIL_SERVER }}
+          server_port: 465
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "✅ PDFMaster Deployment Succeeded"
+          to: ${{ secrets.NOTIFICATION_EMAIL }}
+          from: GitHub Actions <no-reply@github.com>
+          body: "The PDFMaster deployment has completed successfully. Your site is live: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
+

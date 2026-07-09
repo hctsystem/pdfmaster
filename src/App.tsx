@@ -38,6 +38,7 @@ import UnlockTool         from './components/UnlockTool';
 import RedactTool         from './components/RedactTool';
 import CompareTool        from './components/CompareTool';
 import ComingSoonTool     from './components/ComingSoonTool';
+import DeveloperModal    from './components/DeveloperModal';
 
 import './App.css';
 
@@ -504,6 +505,7 @@ function Home() {
             A professional browser-based PDF toolkit. All processing happens locally on your device — zero uploads, maximum privacy.
           </p>
           <div
+            onClick={() => window.dispatchEvent(new CustomEvent('open-dev-modal', { detail: 'about' }))}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
               padding: '0.5rem 1.25rem',
@@ -512,13 +514,40 @@ function Home() {
               borderRadius: 999,
               fontSize: '0.8125rem',
               color: 'var(--text-secondary)',
+              cursor: 'pointer',
+              transition: 'background var(--transition)'
             }}
+            role="button"
+            tabIndex={0}
+            onKeyDown={e => e.key === 'Enter' && window.dispatchEvent(new CustomEvent('open-dev-modal', { detail: 'about' }))}
           >
             <span aria-hidden="true">&#9998;</span>
             Developed by{' '}
-            <strong style={{ color: 'var(--primary)' }}>Harold Trinidad</strong>
+            <strong style={{ color: 'var(--primary)' }}>Harold Calo Trinidad</strong>
           </div>
-          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+          <div style={{ display: 'flex', gap: '1rem', fontSize: '0.8125rem', marginTop: '0.5rem' }}>
+            <button 
+              onClick={() => window.dispatchEvent(new CustomEvent('open-dev-modal', { detail: 'about' }))}
+              style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}
+            >
+              About &amp; Donate
+            </button>
+            <span style={{ color: 'var(--border)' }}>•</span>
+            <button 
+              onClick={() => window.dispatchEvent(new CustomEvent('open-dev-modal', { detail: 'changelog' }))}
+              style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}
+            >
+              Changelog
+            </button>
+            <span style={{ color: 'var(--border)' }}>•</span>
+            <button 
+              onClick={() => window.dispatchEvent(new CustomEvent('open-dev-modal', { detail: 'bug' }))}
+              style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}
+            >
+              Report a Bug
+            </button>
+          </div>
+          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
             &copy; {new Date().getFullYear()} PDFMaster. Built with React, pdf-lib, Tesseract.js &amp; pdfjs-dist.
           </p>
         </div>
@@ -590,6 +619,7 @@ export default function App() {
         <Route path="/compare"           element={<ToolWrapper title="Compare PDF"><CompareTool /></ToolWrapper>} />
         <Route path="*"                  element={<Home />} />
       </Routes>
+      <DeveloperModal />
     </Router>
   );
 }
