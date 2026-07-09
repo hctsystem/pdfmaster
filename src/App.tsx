@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   BrowserRouter as Router, Routes, Route, Link
 } from 'react-router-dom';
@@ -10,7 +10,8 @@ import {
   FileSearch, ChevronRight, Scissors, LayoutGrid,
   Wrench, Archive, Printer, Hash, Droplets, Unlock,
   EyeOff, Search, FileImage, FileX,
-  FileOutput, Layers, Columns2, QrCode, Wifi, User, Camera
+  FileOutput, Layers, Columns2, QrCode, Wifi, User, Camera,
+  Sun, Moon
 } from 'lucide-react';
 
 import CompressorTool     from './components/CompressorTool';
@@ -255,6 +256,21 @@ const CATEGORIES = [
 // ─── Navbar ───────────────────────────────────────────────────────
 function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    const saved = localStorage.getItem('theme');
+    if (saved === 'light' || saved === 'dark') return saved;
+    return 'dark'; // default
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(t => t === 'dark' ? 'light' : 'dark');
+  };
+
   return (
     <>
       <nav className="navbar" role="navigation" aria-label="Main navigation">
@@ -264,8 +280,50 @@ function Navbar() {
           </div>
           <span><b>PDF</b>Master</span>
         </Link>
-        <div className="navbar-actions">
-          <span className="navbar-badge">● Local Processing</span>
+        <div className="navbar-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <Link
+            to="/qr"
+            className="navbar-link-shortcut"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.375rem',
+              padding: '0.4rem 0.875rem',
+              borderRadius: 'var(--radius-sm)',
+              background: 'var(--surface-2)',
+              border: '1px solid var(--border)',
+              color: 'var(--text-secondary)',
+              textDecoration: 'none',
+              fontSize: '0.8125rem',
+              fontWeight: 700,
+              transition: 'all 150ms'
+            }}
+            aria-label="Open QR Code Tools"
+          >
+            <QrCode size={14} color="#7C3AED" />
+            <span className="navbar-shortcut-text">QR Tools</span>
+          </Link>
+
+          <button
+            onClick={toggleTheme}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: 'var(--text-secondary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '0.5rem',
+              borderRadius: 'var(--radius-sm)',
+              transition: 'background var(--transition)',
+            }}
+            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+          >
+            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
+
+          <span className="navbar-badge">● Local</span>
           <button
             className="hamburger"
             aria-label="Toggle navigation menu"

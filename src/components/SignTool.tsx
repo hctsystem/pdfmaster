@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Loader2, PenTool, Trash2, Check, FileText, Move, X } from 'lucide-react';
+import { Loader2, PenTool, Trash2, Check, FileText, Move, X, Upload, Download } from 'lucide-react';
 import { PDFDocument } from 'pdf-lib';
 import SignatureCanvas from 'react-signature-canvas';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -24,16 +24,41 @@ export default function SignTool() {
   const [isDraggingSig, setIsDraggingSig] = useState(false);
   const [dragOffset, setDragOffset]       = useState({ x: 0, y: 0 });
 
-  // Customization States
-  const [sigWidth, setSigWidth]           = useState(180); // adjustable signature display width (px)
-  const [penColor, setPenColor]           = useState('#1e293b'); // pen color: slate, blue, red
-  const [penWidth, setPenWidth]           = useState(3); // pen thickness
+  // Customization & Interactive States
+  const [sigWidth, setSigWidth]           = useState(180); 
+  const [penColor, setPenColor]           = useState('#1e293b'); 
+  const [penWidth, setPenWidth]           = useState(3);
+  const [modalTab, setModalTab]           = useState<'draw' | 'upload'>('draw');
+  const [canvasWidth, setCanvasWidth]     = useState(440);
 
-  const pdfDocRef    = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
-  const sigCanvas    = useRef<SignatureCanvas>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const sigImgRef    = useRef<HTMLImageElement>(null);
+  const pdfDocRef      = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
+  const sigCanvas      = useRef<SignatureCanvas>(null);
+  const fileInputRef   = useRef<HTMLInputElement>(null);
+  const containerRef   = useRef<HTMLDivElement>(null);
+  const sigImgRef      = useRef<HTMLImageElement>(null);
+  const modalContentRef = useRef<HTMLDivElement>(null);
+  const sigUploadRef   = useRef<HTMLInputElement>(null);
+
+  // ── Measure Modal Width dynamically for Mobile Responsiveness ──
+  useEffect(() => {
+    if (showModal) {
+      const handleResize = () => {
+        if (modalContentRef.current) {
+          const contentWidth = modalContentRef.current.clientWidth;
+          // Account for padding (24px each side)
+          setCanvasWidth(Math.max(260, contentWidth - 48));
+        }
+      };
+      
+      // Wait a tick for modal to mount in DOM
+      const timer = setTimeout(handleResize, 60);
+      window.addEventListener('resize', handleResize);
+      return () => {
+        clearTimeout(timer);
+        window.removeEventListener('resize', handleResize);
+      };
+    }
+  }, [showModal, modalTab]);
 
   // ── Render a PDF page to a data URL ─────────────────────────────
   const renderPage = useCallback(async (doc: pdfjsLib.PDFDocumentProxy, pageNum: number) => {
@@ -115,10 +140,9 @@ export default function SignTool() {
     const canvas = sigCanvas.current;
     if (!canvas) return;
     
-    // Fallback if isEmpty() fails or is buggy on some devices
     let dataUrl: string | null = null;
     try {
-      // getTrimmedCanvas drops outer empty spaces
+      // getTrimmedCanvas crops outer empty spaces
       dataUrl = canvas.getTrimmedCanvas().toDataURL('image/png');
     } catch {
       // fallback to full canvas
@@ -130,6 +154,51 @@ export default function SignTool() {
       setSigPos({ x: 40, y: 40 });
       setShowModal(false);
     }
+  };
+
+  // ── Smart Background Removal (Make uploaded signature transparent) ──
+  const processUploadedImage = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.src = reader.result as string;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, 0, 0);
+        
+        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imgData.data;
+        
+        // Loop through all pixels. If it is close to white (RGB > 210), set Alpha to 0
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i];
+          const g = data[i+1];
+          const b = data[i+2];
+          // Near white threshold detection
+          if (r > 210 && g > 210 && b > 210) {
+            data[i+3] = 0; // Transparent
+          }
+        }
+        ctx.putImageData(imgData, 0, 0);
+        
+        setSignatureData(canvas.toDataURL('image/png'));
+        setSigPos({ x: 40, y: 40 });
+        setShowModal(false);
+      };
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // ── Export Drawn/Uploaded Signature ──────────────────────────────
+  const exportSignaturePng = () => {
+    if (!signatureData) return;
+    const a = document.createElement('a');
+    a.href = signatureData;
+    a.download = 'signature.png';
+    a.click();
   };
 
   // ── Stamp signature onto PDF and download ───────────────────────
@@ -277,12 +346,22 @@ export default function SignTool() {
                     onClick={() => setShowModal(true)}
                     aria-label="Open signature pad"
                   >
-                    <PenTool size={18} /> Draw Signature
+                    <PenTool size={18} /> Draw or Upload Signature
                   </button>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    <div style={{ background: 'white', borderRadius: 'var(--radius-sm)', padding: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border)' }}>
-                      <img src={signatureData} alt="Your saved signature preview" style={{ maxHeight: 60, maxWidth: '100%' }} />
+                    {/* Visual Stamp preview — transparent background overlay */}
+                    <div style={{ 
+                      background: 'repeating-conic-gradient(var(--surface-3) 0% 25%, transparent 0% 50%) 50% / 8px 8px', 
+                      borderRadius: 'var(--radius-sm)', 
+                      padding: '0.75rem', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      border: '1px solid var(--border)',
+                      minHeight: 80 
+                    }}>
+                      <img src={signatureData} alt="Your transparent signature preview" style={{ maxHeight: 60, maxWidth: '100%', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }} />
                     </div>
 
                     {/* Signature stamp width customization */}
@@ -304,17 +383,20 @@ export default function SignTool() {
                       />
                     </div>
 
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                       <button
                         className="btn-ghost"
                         onClick={() => { setSignatureData(null); setSigPos({ x: 40, y: 40 }); }}
-                        style={{ flex: 1 }}
+                        style={{ flex: 1, minWidth: 70 }}
                         aria-label="Clear signature"
                       >
                         <Trash2 size={14} /> Clear
                       </button>
-                      <button className="btn-ghost" onClick={() => setShowModal(true)} style={{ flex: 1 }} aria-label="Redraw signature">
+                      <button className="btn-ghost" onClick={() => setShowModal(true)} style={{ flex: 1, minWidth: 70 }} aria-label="Redraw signature">
                         <PenTool size={14} /> Redraw
+                      </button>
+                      <button className="btn-ghost" onClick={exportSignaturePng} style={{ flex: 1, minWidth: 70 }} aria-label="Export signature as transparent PNG file">
+                        <Download size={14} /> Export PNG
                       </button>
                     </div>
                   </div>
@@ -409,87 +491,153 @@ export default function SignTool() {
         </div>
       </div>
 
-      {/* ── Signature Drawing Modal ── */}
+      {/* ── Signature Drawing / Uploading Modal ── */}
       {showModal && (
-        <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Draw your signature">
-          <div className="modal-content" style={{ maxWidth: 520 }}>
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Create signature">
+          <div ref={modalContentRef} className="modal-content" style={{ maxWidth: 500, width: '90%' }}>
             <div className="modal-header">
-              <h3>Draw your signature</h3>
-              <button className="btn-icon" onClick={() => setShowModal(false)} aria-label="Close signature pad">
+              <h3>Create signature</h3>
+              <button className="btn-icon" onClick={() => setShowModal(false)} aria-label="Close signature panel">
                 <X size={16} />
               </button>
             </div>
             
+            {/* Modal Tabs */}
+            <div style={{ display: 'flex', gap: '0.25rem', background: 'var(--surface-2)', border: '1px solid var(--border)', padding: '0.25rem', borderRadius: 'var(--radius-sm)', marginBottom: '1.25rem' }}>
+              <button
+                onClick={() => setModalTab('draw')}
+                style={{
+                  flex: 1, padding: '0.4rem', border: 'none', background: modalTab === 'draw' ? 'var(--primary)' : 'transparent',
+                  color: modalTab === 'draw' ? 'white' : 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 600,
+                  borderRadius: 'calc(var(--radius-sm) - 3px)', transition: 'all 150ms'
+                }}
+                aria-pressed={modalTab === 'draw'}
+              >
+                Draw Signature
+              </button>
+              <button
+                onClick={() => setModalTab('upload')}
+                style={{
+                  flex: 1, padding: '0.4rem', border: 'none', background: modalTab === 'upload' ? 'var(--primary)' : 'transparent',
+                  color: modalTab === 'upload' ? 'white' : 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 600,
+                  borderRadius: 'calc(var(--radius-sm) - 3px)', transition: 'all 150ms'
+                }}
+                aria-pressed={modalTab === 'upload'}
+              >
+                Upload Image
+              </button>
+            </div>
+
             <div className="modal-body">
-              <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-                Draw your signature below. Adjust the pen options to customize.
-              </p>
-              
-              {/* Pen Settings Controls */}
-              <div style={{ display: 'flex', gap: '1.25rem', marginBottom: '1rem', alignItems: 'center' }}>
-                <div>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.375rem' }}>Pen Color</span>
-                  <div style={{ display: 'flex', gap: '0.375rem' }}>
-                    {[
-                      { hex: '#1e293b', name: 'Black' },
-                      { hex: '#2563eb', name: 'Blue' },
-                      { hex: '#dc2626', name: 'Red' },
-                    ].map(c => (
-                      <button
-                        key={c.hex}
-                        onClick={() => setPenColor(c.hex)}
-                        aria-label={`Select ${c.name} pen color`}
+              {modalTab === 'draw' ? (
+                <>
+                  <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+                    Draw your signature on the canvas below. Background is transparent.
+                  </p>
+                  
+                  {/* Pen Settings Controls */}
+                  <div style={{ display: 'flex', gap: '1.25rem', marginBottom: '1rem', alignItems: 'center' }}>
+                    <div>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.375rem' }}>Pen Color</span>
+                      <div style={{ display: 'flex', gap: '0.375rem' }}>
+                        {[
+                          { hex: '#1e293b', name: 'Black' },
+                          { hex: '#2563eb', name: 'Blue' },
+                          { hex: '#dc2626', name: 'Red' },
+                        ].map(c => (
+                          <button
+                            key={c.hex}
+                            onClick={() => setPenColor(c.hex)}
+                            aria-label={`Select ${c.name} pen color`}
+                            style={{
+                              width: 24, height: 24, borderRadius: '50%',
+                              background: c.hex, cursor: 'pointer',
+                              border: penColor === c.hex ? '2px solid var(--primary)' : '1px solid var(--border)',
+                              transform: penColor === c.hex ? 'scale(1.15)' : 'none',
+                              transition: 'all 150ms',
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label htmlFor="pen-width-select" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.375rem' }}>Pen Thickness</label>
+                      <select
+                        id="pen-width-select"
+                        value={penWidth}
+                        onChange={e => setPenWidth(Number(e.target.value))}
                         style={{
-                          width: 24, height: 24, borderRadius: '50%',
-                          background: c.hex, cursor: 'pointer',
-                          border: penColor === c.hex ? '2px solid var(--primary)' : '1px solid var(--border)',
-                          transform: penColor === c.hex ? 'scale(1.15)' : 'none',
-                          transition: 'all 150ms',
+                          padding: '0.25rem 0.5rem', background: 'var(--surface-2)',
+                          border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
+                          color: 'var(--text-main)', fontSize: '0.75rem', cursor: 'pointer'
                         }}
-                      />
-                    ))}
+                        aria-label="Select pen thickness"
+                      >
+                        <option value={1}>Thin (1px)</option>
+                        <option value={3}>Medium (3px)</option>
+                        <option value={5}>Thick (5px)</option>
+                      </select>
+                    </div>
                   </div>
-                </div>
 
-                <div>
-                  <label htmlFor="pen-width-select" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.375rem' }}>Pen Thickness</label>
-                  <select
-                    id="pen-width-select"
-                    value={penWidth}
-                    onChange={e => setPenWidth(Number(e.target.value))}
-                    style={{
-                      padding: '0.25rem 0.5rem', background: 'var(--surface-2)',
-                      border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
-                      color: 'var(--text-main)', fontSize: '0.75rem', cursor: 'pointer'
-                    }}
-                    aria-label="Select pen thickness"
+                  <div style={{ background: 'white', borderRadius: 'var(--radius-sm)', overflow: 'hidden', border: '1px solid var(--border)' }}>
+                    <SignatureCanvas
+                      ref={sigCanvas}
+                      canvasProps={{ width: canvasWidth, height: 200, className: 'sigCanvas' }}
+                      backgroundColor="rgba(255,255,255,0)"
+                      penColor={penColor}
+                      minWidth={penWidth - 0.5}
+                      maxWidth={penWidth + 0.5}
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
+                    Upload a photo of your signature. White backgrounds will be automatically stripped out to make it transparent.
+                  </p>
+                  
+                  <div
+                    className="upload-area"
+                    onClick={() => sigUploadRef.current?.click()}
+                    style={{ border: '2px dashed var(--border)', padding: '2rem 1.5rem', cursor: 'pointer' }}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={e => e.key === 'Enter' && sigUploadRef.current?.click()}
+                    aria-label="Upload signature image"
                   >
-                    <option value={1}>Thin (1px)</option>
-                    <option value={3}>Medium (3px)</option>
-                    <option value={5}>Thick (5px)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div style={{ background: 'white', borderRadius: 'var(--radius-sm)', overflow: 'hidden', border: '1px solid var(--border)' }}>
-                <SignatureCanvas
-                  ref={sigCanvas}
-                  canvasProps={{ width: 476, height: 200, className: 'sigCanvas' }}
-                  backgroundColor="rgba(255,255,255,1)"
-                  penColor={penColor}
-                  minWidth={penWidth - 0.5}
-                  maxWidth={penWidth + 0.5}
-                />
-              </div>
+                    <Upload size={32} color="var(--primary)" aria-hidden="true" />
+                    <div>
+                      <p style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)' }}>Upload signature image</p>
+                      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>Supports PNG, JPG, JPEG</p>
+                    </div>
+                    <input
+                      ref={sigUploadRef}
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={e => e.target.files && processUploadedImage(e.target.files[0])}
+                      aria-label="Select signature image file"
+                    />
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="modal-footer">
-              <button className="btn-ghost" onClick={clearSignature} aria-label="Clear the canvas">
-                <Trash2 size={14} /> Clear
-              </button>
-              <button className="btn-primary" onClick={saveSignature} aria-label="Save the drawn signature">
-                <Check size={16} /> Save Signature
-              </button>
+              {modalTab === 'draw' ? (
+                <>
+                  <button className="btn-ghost" onClick={clearSignature} aria-label="Clear drawing canvas">
+                    <Trash2 size={14} /> Clear
+                  </button>
+                  <button className="btn-primary" onClick={saveSignature} aria-label="Save signature">
+                    <Check size={16} /> Save Signature
+                  </button>
+                </>
+              ) : (
+                <button className="btn-ghost" onClick={() => setShowModal(false)} aria-label="Cancel signature creation">Cancel</button>
+              )}
             </div>
           </div>
         </div>
