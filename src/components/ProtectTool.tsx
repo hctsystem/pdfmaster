@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { Loader2, Lock, Trash2, ShieldCheck, FileText } from 'lucide-react';
 import { PDFDocument } from 'pdf-lib';
+import { encryptPDF } from '@pdfsmaller/pdf-encrypt-lite';
 
 export default function ProtectTool() {
   const [file, setFile]           = useState<File | null>(null);
@@ -28,7 +29,11 @@ export default function ProtectTool() {
     try {
       const bytes = await file.arrayBuffer();
       const pdf = await PDFDocument.load(bytes);
-      const protectedBytes = await pdf.save();
+      const pdfBytes = await pdf.save();
+      
+      // Encrypt PDF bytes using pdf-encrypt-lite client-side
+      const protectedBytes = await encryptPDF(pdfBytes, password);
+      
       const blob = new Blob([protectedBytes as any], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
