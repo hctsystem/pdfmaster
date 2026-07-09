@@ -74,17 +74,26 @@ export default function WatermarkTool() {
 
       pages.forEach(page => {
         const { width, height } = page.getSize();
+        const rotation = page.getRotation().angle;
 
         if (position === 'Diagonal (center)') {
           // Single diagonal watermark centered on the page
+          const textWidth = font.widthOfTextAtSize(text, fontSize);
+          const angle = 45 - rotation;
+          const rad = (angle * Math.PI) / 180;
+          const cos = Math.cos(rad);
+          const sin = Math.sin(rad);
+          const dx = (textWidth / 2) * cos - (fontSize / 2) * sin;
+          const dy = (textWidth / 2) * sin + (fontSize / 2) * cos;
+
           page.drawText(text, {
-            x: width * 0.1,
-            y: height * 0.3,
+            x: (width / 2) - dx,
+            y: (height / 2) - dy,
             size: fontSize,
             font,
             color: fillColor,
             opacity,
-            rotate: degrees(45),
+            rotate: degrees(angle),
           });
         } else {
           // Tiled: 3x3 grid
@@ -92,19 +101,28 @@ export default function WatermarkTool() {
           const rows = 3;
           const cellW = width / cols;
           const cellH = height / rows;
+          const tileFontSize = Math.round(fontSize * 0.45);
+          const tileTextWidth = font.widthOfTextAtSize(text, tileFontSize);
+          const angle = 30 - rotation;
 
           for (let row = 0; row < rows; row++) {
             for (let col = 0; col < cols; col++) {
-              const cx = cellW * col + cellW * 0.15;
-              const cy = cellH * row + cellH * 0.35;
+              const cx = cellW * col + cellW / 2;
+              const cy = cellH * row + cellH / 2;
+              const rad = (angle * Math.PI) / 180;
+              const cos = Math.cos(rad);
+              const sin = Math.sin(rad);
+              const dx = (tileTextWidth / 2) * cos - (tileFontSize / 2) * sin;
+              const dy = (tileTextWidth / 2) * sin + (tileFontSize / 2) * cos;
+
               page.drawText(text, {
-                x: cx,
-                y: cy,
-                size: Math.round(fontSize * 0.45),
+                x: cx - dx,
+                y: cy - dy,
+                size: tileFontSize,
                 font,
                 color: fillColor,
                 opacity,
-                rotate: degrees(30),
+                rotate: degrees(angle),
               });
             }
           }

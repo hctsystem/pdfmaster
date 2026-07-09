@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Loader2, PenTool, Trash2, X, Check, FileText, Move } from 'lucide-react';
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, degrees } from 'pdf-lib';
 import SignatureCanvas from 'react-signature-canvas';
 import * as pdfjsLib from 'pdfjs-dist';
 
@@ -130,23 +130,54 @@ export default function SignTool() {
       const pages = pdf.getPages();
       const targetPage = pages[currentPage - 1] ?? pages[pages.length - 1];
       const { width: pdfW, height: pdfH } = targetPage.getSize();
+      const rotation = targetPage.getRotation().angle;
 
-      // Signature intrinsic size — scale to ~30% of page width
+      // Signature intrinsic size — scale to ~28% of visual page width
       const sigImg    = sigImgRef.current!;
       const sigAspect = sigImg.naturalWidth / sigImg.naturalHeight;
-      const sigWpdf   = pdfW * 0.28;
+      
+      const isRotated90or270 = (rotation === 90 || rotation === 270);
+      const visualW = isRotated90or270 ? pdfH : pdfW;
+      const visualH = isRotated90or270 ? pdfW : pdfH;
+      
+      const sigWpdf   = visualW * 0.28;
       const sigHpdf   = sigWpdf / sigAspect;
 
-      // Map sigPos fractions → PDF coordinates (Y axis flipped)
-      const pdfX = sigPos.x * pdfW;
-      const pdfY = pdfH - sigPos.y * pdfH - sigHpdf;
+      // Calculate visual coordinates (rx, ry)
+      const rx = sigPos.x * visualW;
+      const ry = visualH - sigPos.y * visualH - sigHpdf;
+
+      // Map visual coordinates to physical PDF coordinates based on page rotation
+      let x: number;
+      let y: number;
+      let angle: number;
+
+      if (rotation === 90) {
+        x = ry;
+        y = pdfW - rx - sigWpdf;
+        angle = -90;
+      } else if (rotation === 180) {
+        x = pdfW - rx - sigWpdf;
+        y = pdfH - ry - sigHpdf;
+        angle = -180;
+      } else if (rotation === 270) {
+        x = pdfH - ry - sigHpdf;
+        y = rx;
+        angle = -270;
+      } else {
+        // 0 degrees
+        x = rx;
+        y = ry;
+        angle = 0;
+      }
 
       const pngImage = await pdf.embedPng(signatureData);
       targetPage.drawImage(pngImage, {
-        x: Math.max(0, Math.min(pdfX, pdfW - sigWpdf)),
-        y: Math.max(0, Math.min(pdfY, pdfH - sigHpdf)),
+        x: Math.max(0, Math.min(x, pdfW - (isRotated90or270 ? sigHpdf : sigWpdf))),
+        y: Math.max(0, Math.min(y, pdfH - (isRotated90or270 ? sigWpdf : sigHpdf))),
         width: sigWpdf,
         height: sigHpdf,
+        rotate: degrees(angle),
       });
 
       const signedBytes = await pdf.save();
@@ -283,16 +314,37 @@ export default function SignTool() {
           </div>
           <div
             className="preview-panel-body"
-            style={{ height: 560, position: 'relative', overflow: 'hidden', padding: 0 }}
-            ref={containerRef}
+            style={{ 
+              height: 560, 
+              background: '#525659',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '1.5rem',
+              overflow: 'auto',
+              position: 'relative'
+            }}
           >
             {pageDataUrl ? (
-              <>
+              <div
+                ref={containerRef}
+                style={{
+                  position: 'relative',
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+                  display: 'inline-block',
+                  lineHeight: 0
+                }}
+              >
                 {/* PDF page image */}
                 <img
                   src={pageDataUrl}
                   alt={`PDF page ${currentPage} preview`}
-                  style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', userSelect: 'none' }}
+                  style={{ 
+                    maxHeight: '520px', 
+                    width: 'auto', 
+                    display: 'block', 
+                    userSelect: 'none' 
+                  }}
                   draggable={false}
                 />
 
@@ -318,7 +370,7 @@ export default function SignTool() {
                     }}
                   />
                 )}
-              </>
+              </div>
             ) : isRendering ? (
               <div className="preview-empty" role="status">
                 <Loader2 size={40} className="spinner" color="var(--primary)" />

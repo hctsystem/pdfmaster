@@ -206,7 +206,7 @@ export default function DeveloperModal() {
                   }}
                 >
                   <img 
-                    src="/gcashqr.jpg" 
+                    src={`${import.meta.env.BASE_URL || '/'}gcashqr.jpg`}
                     alt="GCash QR Code" 
                     onError={(e) => {
                       // Fallback placeholder if image not uploaded yet

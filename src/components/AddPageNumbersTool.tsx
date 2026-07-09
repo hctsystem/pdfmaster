@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { FileText, Hash, Loader2, Download, Trash2 } from 'lucide-react';
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { PDFDocument, StandardFonts, rgb, degrees } from 'pdf-lib';
 
 type Position =
   | 'Bottom Center'
@@ -106,28 +106,60 @@ export default function AddPageNumbersTool() {
 
       pages.forEach((page, idx) => {
         const { width, height } = page.getSize();
+        const rotation = page.getRotation().angle;
         const n = startNumber + idx;
         const label = formatLabel(format, n, total + startNumber - 1);
         const textWidth = font.widthOfTextAtSize(label, fontSize);
 
-        let x: number;
-        let y: number;
+        // Determine visual width (vW) and visual height (vH) based on page rotation
+        const isRotated90or270 = (rotation === 90 || rotation === 270);
+        const vW = isRotated90or270 ? height : width;
+        const vH = isRotated90or270 ? width : height;
 
-        // Y position
-        if (position.startsWith('Bottom')) {
-          y = 20;
-        } else {
-          y = height - 30;
-        }
+        // 1. Calculate visual coordinates (vx, vy)
+        let vx: number;
+        let vy: number;
 
-        // X position
+        // Visual X position
         if (position.endsWith('Center')) {
-          x = (width - textWidth) / 2;
+          vx = (vW - textWidth) / 2;
         } else if (position.endsWith('Left')) {
-          x = 20;
+          vx = 20;
         } else {
           // Right
-          x = width - textWidth - 20;
+          vx = vW - textWidth - 20;
+        }
+
+        // Visual Y position
+        if (position.startsWith('Bottom')) {
+          vy = 20;
+        } else {
+          // Top
+          vy = vH - 30;
+        }
+
+        // 2. Map visual coordinates (vx, vy) and text angle to physical PDF coordinates based on rotation
+        let x: number;
+        let y: number;
+        let angle: number;
+
+        if (rotation === 90) {
+          x = vy;
+          y = width - vx;
+          angle = -90;
+        } else if (rotation === 180) {
+          x = width - vx;
+          y = height - vy;
+          angle = -180;
+        } else if (rotation === 270) {
+          x = height - vy;
+          y = vx;
+          angle = -270;
+        } else {
+          // 0 degrees
+          x = vx;
+          y = vy;
+          angle = 0;
         }
 
         page.drawText(label, {
@@ -136,6 +168,7 @@ export default function AddPageNumbersTool() {
           size: fontSize,
           font,
           color: fillColor,
+          rotate: degrees(angle),
         });
       });
 
