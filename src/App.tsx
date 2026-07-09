@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   BrowserRouter as Router, Routes, Route, Link
 } from 'react-router-dom';
@@ -7,141 +7,247 @@ import {
   PenTool, Image as ImageIcon, FileText,
   ArrowLeft, ShieldCheck, Zap, Globe, RotateCw,
   Eye, ScanText, Edit3, Images, Menu, X,
-  FileSearch, ChevronRight
+  FileSearch, ChevronRight, Scissors, LayoutGrid,
+  Wrench, Archive, Printer, Hash, Droplets, Unlock,
+  EyeOff, Search, FileImage, FileX,
+  FileOutput, Layers, Columns2
 } from 'lucide-react';
 
-import CompressorTool from './components/CompressorTool';
-import MergeTool from './components/MergeTool';
-import SplitTool from './components/SplitTool';
-import ProtectTool from './components/ProtectTool';
-import SignTool from './components/SignTool';
-import ImageToPdfTool from './components/ImageToPdfTool';
-import RotateTool from './components/RotateTool';
-import ExtractImagesTool from './components/ExtractImagesTool';
-import WordToPdfTool from './components/WordToPdfTool';
-import PdfViewerTool from './components/PdfViewerTool';
-import OcrTool from './components/OcrTool';
-import EditPdfTool from './components/EditPdfTool';
+import CompressorTool     from './components/CompressorTool';
+import MergeTool          from './components/MergeTool';
+import SplitTool          from './components/SplitTool';
+import ProtectTool        from './components/ProtectTool';
+import SignTool           from './components/SignTool';
+import ImageToPdfTool     from './components/ImageToPdfTool';
+import RotateTool         from './components/RotateTool';
+import ExtractImagesTool  from './components/ExtractImagesTool';
+import WordToPdfTool      from './components/WordToPdfTool';
+import PdfViewerTool      from './components/PdfViewerTool';
+import OcrTool            from './components/OcrTool';
+import EditPdfTool        from './components/EditPdfTool';
+import RemovePagesTool    from './components/RemovePagesTool';
+import ExtractPagesTool   from './components/ExtractPagesTool';
+import OrganizeTool       from './components/OrganizeTool';
+import RepairTool         from './components/RepairTool';
+import PdfToJpgTool       from './components/PdfToJpgTool';
+import PdfToPdfATool      from './components/PdfToPdfATool';
+import HtmlToPdfTool      from './components/HtmlToPdfTool';
+import AddPageNumbersTool from './components/AddPageNumbersTool';
+import WatermarkTool      from './components/WatermarkTool';
+import UnlockTool         from './components/UnlockTool';
+import RedactTool         from './components/RedactTool';
+import CompareTool        from './components/CompareTool';
+import ComingSoonTool     from './components/ComingSoonTool';
 
 import './App.css';
 
-// ─── Tool color themes ───────────────────────────────────────────
-const toolColors: Record<string, { bg: string; color: string; glow: string }> = {
-  compress:      { bg: 'rgba(249,115,22,0.12)',  color: '#F97316', glow: 'rgba(249,115,22,0.3)' },
-  merge:         { bg: 'rgba(59,130,246,0.12)',  color: '#3B82F6', glow: 'rgba(59,130,246,0.3)' },
-  split:         { bg: 'rgba(139,92,246,0.12)',  color: '#8B5CF6', glow: 'rgba(139,92,246,0.3)' },
-  rotate:        { bg: 'rgba(20,184,166,0.12)',  color: '#14B8A6', glow: 'rgba(20,184,166,0.3)' },
-  sign:          { bg: 'rgba(236,72,153,0.12)',  color: '#EC4899', glow: 'rgba(236,72,153,0.3)' },
-  protect:       { bg: 'rgba(239,68,68,0.12)',   color: '#EF4444', glow: 'rgba(239,68,68,0.3)'  },
-  'image-to-pdf':{ bg: 'rgba(34,197,94,0.12)',   color: '#22C55E', glow: 'rgba(34,197,94,0.3)'  },
-  'word-to-pdf': { bg: 'rgba(59,130,246,0.12)',  color: '#60A5FA', glow: 'rgba(96,165,250,0.3)' },
-  'extract-images':{ bg: 'rgba(251,191,36,0.12)',color: '#FBBF24', glow: 'rgba(251,191,36,0.3)' },
-  viewer:        { bg: 'rgba(96,165,250,0.12)',  color: '#60A5FA', glow: 'rgba(96,165,250,0.3)' },
-  ocr:           { bg: 'rgba(167,139,250,0.12)', color: '#A78BFA', glow: 'rgba(167,139,250,0.3)'},
-  'edit-pdf':    { bg: 'rgba(52,211,153,0.12)',  color: '#34D399', glow: 'rgba(52,211,153,0.3)' },
-};
+// ─── Tool categories & definitions ───────────────────────────────
+interface ToolDef {
+  id: string;
+  title: string;
+  description: string;
+  icon: React.ReactNode;
+  path: string;
+  color: string;
+  glow: string;
+  bg: string;
+  category: string;
+  isNew?: boolean;
+}
 
-// ─── Tool definitions ─────────────────────────────────────────────
-const tools = [
+const ALL_TOOLS: ToolDef[] = [
+  // Organize PDF
   {
-    id: 'viewer',
-    title: 'PDF Viewer',
-    description: 'Open and read PDF documents with page navigation and zoom.',
-    icon: <Eye size={22} />,
-    path: '/viewer',
-    isPrivate: true,
-    isNew: true,
-  },
-  {
-    id: 'edit-pdf',
-    title: 'Edit PDF',
-    description: 'Add text, highlights, and freehand drawings directly on your PDF.',
-    icon: <Edit3 size={22} />,
-    path: '/edit-pdf',
-    isPrivate: true,
-    isNew: true,
-  },
-  {
-    id: 'ocr',
-    title: 'OCR — Extract Text',
-    description: 'Extract text from scanned images & multi-page PDFs. Export as .txt or searchable PDF.',
-    icon: <ScanText size={22} />,
-    path: '/ocr',
-    isPrivate: true,
-    isNew: true,
-  },
-  {
-    id: 'compress',
-    title: 'Compress PDF & Images',
-    description: 'Reduce file size while preserving quality.',
-    icon: <Minimize2 size={22} />,
-    path: '/compress',
-    isPrivate: true,
-  },
-  {
-    id: 'merge',
-    title: 'Merge PDF',
+    id: 'merge', title: 'Merge PDF',
     description: 'Combine multiple PDF files into one document.',
-    icon: <Combine size={22} />,
-    path: '/merge',
-    isPrivate: true,
+    icon: <Combine size={22} />, path: '/merge',
+    color: '#3B82F6', glow: 'rgba(59,130,246,0.3)', bg: 'rgba(59,130,246,0.12)', category: 'Organize PDF',
   },
   {
-    id: 'split',
-    title: 'Split & Organize',
+    id: 'split', title: 'Split PDF',
     description: 'Separate pages or reorder your PDF document.',
-    icon: <SplitSquareVertical size={22} />,
-    path: '/split',
-    isPrivate: true,
+    icon: <SplitSquareVertical size={22} />, path: '/split',
+    color: '#8B5CF6', glow: 'rgba(139,92,246,0.3)', bg: 'rgba(139,92,246,0.12)', category: 'Organize PDF',
   },
   {
-    id: 'rotate',
-    title: 'Rotate PDF',
+    id: 'remove-pages', title: 'Remove Pages',
+    description: 'Delete specific pages from your PDF.',
+    icon: <FileX size={22} />, path: '/remove-pages',
+    color: '#EF4444', glow: 'rgba(239,68,68,0.3)', bg: 'rgba(239,68,68,0.12)', category: 'Organize PDF', isNew: true,
+  },
+  {
+    id: 'extract-pages', title: 'Extract Pages',
+    description: 'Pull out a page range into a new PDF file.',
+    icon: <Scissors size={22} />, path: '/extract-pages',
+    color: '#F97316', glow: 'rgba(249,115,22,0.3)', bg: 'rgba(249,115,22,0.12)', category: 'Organize PDF', isNew: true,
+  },
+  {
+    id: 'organize', title: 'Organize PDF',
+    description: 'Drag and drop to reorder pages in your PDF.',
+    icon: <LayoutGrid size={22} />, path: '/organize',
+    color: '#06B6D4', glow: 'rgba(6,182,212,0.3)', bg: 'rgba(6,182,212,0.12)', category: 'Organize PDF', isNew: true,
+  },
+  {
+    id: 'rotate', title: 'Rotate PDF',
     description: 'Rotate PDF pages clockwise or counter-clockwise.',
-    icon: <RotateCw size={22} />,
-    path: '/rotate',
-    isPrivate: true,
+    icon: <RotateCw size={22} />, path: '/rotate',
+    color: '#14B8A6', glow: 'rgba(20,184,166,0.3)', bg: 'rgba(20,184,166,0.12)', category: 'Organize PDF',
+  },
+
+  // Optimize PDF
+  {
+    id: 'compress', title: 'Compress PDF',
+    description: 'Reduce file size while preserving quality.',
+    icon: <Minimize2 size={22} />, path: '/compress',
+    color: '#F97316', glow: 'rgba(249,115,22,0.3)', bg: 'rgba(249,115,22,0.12)', category: 'Optimize PDF',
   },
   {
-    id: 'sign',
-    title: 'Sign PDF',
-    description: 'Draw or upload a signature and stamp your PDF.',
-    icon: <PenTool size={22} />,
-    path: '/sign',
-    isPrivate: true,
+    id: 'repair', title: 'Repair PDF',
+    description: 'Fix corrupted PDFs by re-parsing the structure.',
+    icon: <Wrench size={22} />, path: '/repair',
+    color: '#84CC16', glow: 'rgba(132,204,22,0.3)', bg: 'rgba(132,204,22,0.12)', category: 'Optimize PDF', isNew: true,
   },
   {
-    id: 'protect',
-    title: 'Protect PDF',
-    description: 'Encrypt your PDF with a secure password.',
-    icon: <Lock size={22} />,
-    path: '/protect',
-    isPrivate: true,
+    id: 'ocr', title: 'OCR — Extract Text',
+    description: 'Extract text from scanned PDFs and images.',
+    icon: <ScanText size={22} />, path: '/ocr',
+    color: '#A78BFA', glow: 'rgba(167,139,250,0.3)', bg: 'rgba(167,139,250,0.12)', category: 'Optimize PDF',
   },
+
+  // Convert to PDF
   {
-    id: 'image-to-pdf',
-    title: 'Image to PDF',
+    id: 'image-to-pdf', title: 'JPG to PDF',
     description: 'Convert JPG, PNG, and WebP into high-quality PDFs.',
-    icon: <ImageIcon size={22} />,
-    path: '/image-to-pdf',
-    isPrivate: true,
+    icon: <ImageIcon size={22} />, path: '/image-to-pdf',
+    color: '#22C55E', glow: 'rgba(34,197,94,0.3)', bg: 'rgba(34,197,94,0.12)', category: 'Convert to PDF',
   },
   {
-    id: 'extract-images',
-    title: 'Extract Images',
-    description: 'Pull all embedded images from a PDF into a ZIP.',
-    icon: <Images size={22} />,
-    path: '/extract-images',
-    isPrivate: true,
-  },
-  {
-    id: 'word-to-pdf',
-    title: 'Word to PDF',
+    id: 'word-to-pdf', title: 'Word to PDF',
     description: 'High-fidelity conversion from .docx to .pdf.',
-    icon: <FileText size={22} />,
-    path: '/word-to-pdf',
-    isPrivate: false,
+    icon: <FileText size={22} />, path: '/word-to-pdf',
+    color: '#60A5FA', glow: 'rgba(96,165,250,0.3)', bg: 'rgba(96,165,250,0.12)', category: 'Convert to PDF',
   },
+  {
+    id: 'ppt-to-pdf', title: 'PowerPoint to PDF',
+    description: 'Convert .pptx presentations to PDF format.',
+    icon: <Layers size={22} />, path: '/ppt-to-pdf',
+    color: '#F59E0B', glow: 'rgba(245,158,11,0.3)', bg: 'rgba(245,158,11,0.12)', category: 'Convert to PDF', isNew: true,
+  },
+  {
+    id: 'excel-to-pdf', title: 'Excel to PDF',
+    description: 'Convert .xlsx spreadsheets to PDF format.',
+    icon: <Layers size={22} />, path: '/excel-to-pdf',
+    color: '#10B981', glow: 'rgba(16,185,129,0.3)', bg: 'rgba(16,185,129,0.12)', category: 'Convert to PDF', isNew: true,
+  },
+  {
+    id: 'html-to-pdf', title: 'HTML to PDF',
+    description: 'Convert a web page or HTML code to PDF.',
+    icon: <Printer size={22} />, path: '/html-to-pdf',
+    color: '#EC4899', glow: 'rgba(236,72,153,0.3)', bg: 'rgba(236,72,153,0.12)', category: 'Convert to PDF', isNew: true,
+  },
+
+  // Convert from PDF
+  {
+    id: 'pdf-to-jpg', title: 'PDF to JPG',
+    description: 'Convert each PDF page to a JPG image.',
+    icon: <FileImage size={22} />, path: '/pdf-to-jpg',
+    color: '#FBBF24', glow: 'rgba(251,191,36,0.3)', bg: 'rgba(251,191,36,0.12)', category: 'Convert from PDF', isNew: true,
+  },
+  {
+    id: 'pdf-to-word', title: 'PDF to Word',
+    description: 'Convert PDF documents to editable .docx files.',
+    icon: <FileOutput size={22} />, path: '/pdf-to-word',
+    color: '#60A5FA', glow: 'rgba(96,165,250,0.3)', bg: 'rgba(96,165,250,0.12)', category: 'Convert from PDF', isNew: true,
+  },
+  {
+    id: 'pdf-to-ppt', title: 'PDF to PowerPoint',
+    description: 'Convert PDF pages to .pptx presentation slides.',
+    icon: <FileOutput size={22} />, path: '/pdf-to-ppt',
+    color: '#F59E0B', glow: 'rgba(245,158,11,0.3)', bg: 'rgba(245,158,11,0.12)', category: 'Convert from PDF', isNew: true,
+  },
+  {
+    id: 'pdf-to-excel', title: 'PDF to Excel',
+    description: 'Extract tables from PDF into .xlsx spreadsheets.',
+    icon: <FileOutput size={22} />, path: '/pdf-to-excel',
+    color: '#10B981', glow: 'rgba(16,185,129,0.3)', bg: 'rgba(16,185,129,0.12)', category: 'Convert from PDF', isNew: true,
+  },
+  {
+    id: 'pdf-to-pdfa', title: 'PDF to PDF/A',
+    description: 'Convert PDF to the PDF/A archival standard.',
+    icon: <Archive size={22} />, path: '/pdf-to-pdfa',
+    color: '#818CF8', glow: 'rgba(129,140,248,0.3)', bg: 'rgba(129,140,248,0.12)', category: 'Convert from PDF', isNew: true,
+  },
+
+  // Edit PDF
+  {
+    id: 'edit-pdf', title: 'Edit PDF',
+    description: 'Add text, highlights, and drawings on your PDF.',
+    icon: <Edit3 size={22} />, path: '/edit-pdf',
+    color: '#34D399', glow: 'rgba(52,211,153,0.3)', bg: 'rgba(52,211,153,0.12)', category: 'Edit PDF',
+  },
+  {
+    id: 'add-page-numbers', title: 'Add Page Numbers',
+    description: 'Stamp page numbers on every page of your PDF.',
+    icon: <Hash size={22} />, path: '/add-page-numbers',
+    color: '#A78BFA', glow: 'rgba(167,139,250,0.3)', bg: 'rgba(167,139,250,0.12)', category: 'Edit PDF', isNew: true,
+  },
+  {
+    id: 'watermark', title: 'Add Watermark',
+    description: 'Add a diagonal text watermark to all pages.',
+    icon: <Droplets size={22} />, path: '/watermark',
+    color: '#38BDF8', glow: 'rgba(56,189,248,0.3)', bg: 'rgba(56,189,248,0.12)', category: 'Edit PDF', isNew: true,
+  },
+  {
+    id: 'extract-images', title: 'Extract Images',
+    description: 'Pull all embedded images from a PDF into a ZIP.',
+    icon: <Images size={22} />, path: '/extract-images',
+    color: '#FBBF24', glow: 'rgba(251,191,36,0.3)', bg: 'rgba(251,191,36,0.12)', category: 'Edit PDF',
+  },
+
+  // PDF Viewer
+  {
+    id: 'viewer', title: 'PDF Viewer',
+    description: 'Open and read PDF documents with page navigation.',
+    icon: <Eye size={22} />, path: '/viewer',
+    color: '#60A5FA', glow: 'rgba(96,165,250,0.3)', bg: 'rgba(96,165,250,0.12)', category: 'View & OCR',
+  },
+
+  // PDF Security
+  {
+    id: 'sign', title: 'Sign PDF',
+    description: 'Draw a signature and drag it anywhere on the page.',
+    icon: <PenTool size={22} />, path: '/sign',
+    color: '#EC4899', glow: 'rgba(236,72,153,0.3)', bg: 'rgba(236,72,153,0.12)', category: 'PDF Security',
+  },
+  {
+    id: 'protect', title: 'Protect PDF',
+    description: 'Encrypt your PDF with a secure password.',
+    icon: <Lock size={22} />, path: '/protect',
+    color: '#EF4444', glow: 'rgba(239,68,68,0.3)', bg: 'rgba(239,68,68,0.12)', category: 'PDF Security',
+  },
+  {
+    id: 'unlock', title: 'Unlock PDF',
+    description: 'Remove password protection from a PDF.',
+    icon: <Unlock size={22} />, path: '/unlock',
+    color: '#F59E0B', glow: 'rgba(245,158,11,0.3)', bg: 'rgba(245,158,11,0.12)', category: 'PDF Security', isNew: true,
+  },
+  {
+    id: 'redact', title: 'Redact PDF',
+    description: 'Permanently black out sensitive content in your PDF.',
+    icon: <EyeOff size={22} />, path: '/redact',
+    color: '#6B7280', glow: 'rgba(107,114,128,0.3)', bg: 'rgba(107,114,128,0.12)', category: 'PDF Security', isNew: true,
+  },
+  {
+    id: 'compare', title: 'Compare PDF',
+    description: 'View two PDFs side-by-side to spot differences.',
+    icon: <Columns2 size={22} />, path: '/compare',
+    color: '#14B8A6', glow: 'rgba(20,184,166,0.3)', bg: 'rgba(20,184,166,0.12)', category: 'PDF Security', isNew: true,
+  },
+];
+
+const CATEGORIES = [
+  'All', 'Organize PDF', 'Optimize PDF', 'Convert to PDF',
+  'Convert from PDF', 'Edit PDF', 'PDF Security', 'View & OCR',
 ];
 
 // ─── Navbar ───────────────────────────────────────────────────────
@@ -168,7 +274,6 @@ function Navbar() {
           </button>
         </div>
       </nav>
-      {/* Mobile menu */}
       {mobileOpen && (
         <div
           className="modal-overlay"
@@ -177,10 +282,10 @@ function Navbar() {
         >
           <div
             className="glass-card"
-            style={{ width: '100%', maxWidth: 360, padding: '1rem', borderRadius: 'var(--radius)', animation: 'slideUp 200ms ease' }}
+            style={{ width: '100%', maxWidth: 360, padding: '1rem', borderRadius: 'var(--radius)', animation: 'slideUp 200ms ease', maxHeight: '70vh', overflowY: 'auto' }}
             onClick={e => e.stopPropagation()}
           >
-            {tools.slice(0, 6).map(tool => (
+            {ALL_TOOLS.slice(0, 8).map(tool => (
               <Link
                 key={tool.id}
                 to={tool.path}
@@ -193,7 +298,7 @@ function Navbar() {
                   transition: 'background var(--transition)',
                 }}
               >
-                <span style={{ color: toolColors[tool.id]?.color }}>{tool.icon}</span>
+                <span style={{ color: tool.color }}>{tool.icon}</span>
                 {tool.title}
               </Link>
             ))}
@@ -220,6 +325,28 @@ function Navbar() {
 
 // ─── Home Page ────────────────────────────────────────────────────
 function Home() {
+  const [search, setSearch]     = useState('');
+  const [activeCategory, setActiveCategory] = useState('All');
+
+  const filtered = useMemo(() => {
+    return ALL_TOOLS.filter(t => {
+      const matchesSearch = !search || t.title.toLowerCase().includes(search.toLowerCase()) || t.description.toLowerCase().includes(search.toLowerCase());
+      const matchesCat    = activeCategory === 'All' || t.category === activeCategory;
+      return matchesSearch && matchesCat;
+    });
+  }, [search, activeCategory]);
+
+  // Group tools by category (in display order)
+  const grouped = useMemo(() => {
+    if (activeCategory !== 'All' || search) return { [activeCategory || 'Results']: filtered };
+    const groups: Record<string, ToolDef[]> = {};
+    for (const t of filtered) {
+      if (!groups[t.category]) groups[t.category] = [];
+      groups[t.category].push(t);
+    }
+    return groups;
+  }, [filtered, activeCategory, search]);
+
   return (
     <div className="page-wrapper">
       {/* Hero */}
@@ -234,7 +361,7 @@ function Home() {
           <span className="hero-title-accent">Right in Your Browser</span>
         </h1>
         <p className="hero-subtitle">
-          Compress, merge, split, sign, protect, edit PDFs and extract text with OCR — all processed locally on your device.
+          30+ tools to compress, merge, split, convert, sign, protect, edit and OCR your PDFs — all processed locally on your device.
         </p>
         <div className="hero-badges" role="list">
           <div className="hero-badge" role="listitem"><Zap size={14} aria-hidden="true" /> Lightning Fast</div>
@@ -244,47 +371,85 @@ function Home() {
         </div>
       </section>
 
-      {/* Tool Grid */}
+      {/* Search + Filter */}
+      <div className="tools-search-bar-wrapper">
+        <div className="tools-search-bar">
+          <Search size={18} className="tools-search-icon" aria-hidden="true" />
+          <input
+            type="search"
+            placeholder="Search tools…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="tools-search-input"
+            aria-label="Search PDF tools"
+            id="tool-search"
+          />
+        </div>
+        <div className="tools-category-chips" role="tablist" aria-label="Filter tools by category">
+          {CATEGORIES.map(cat => (
+            <button
+              key={cat}
+              className={`category-chip ${activeCategory === cat ? 'active' : ''}`}
+              onClick={() => setActiveCategory(cat)}
+              role="tab"
+              aria-selected={activeCategory === cat}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Tool Grid — grouped by category */}
       <main className="tools-section">
-        <div className="section-header">
-          <p className="section-label">All Tools</p>
-          <h2 className="section-title">Everything you need for PDFs</h2>
-        </div>
-        <div className="tool-grid" role="list">
-          {tools.map(tool => {
-            const theme = toolColors[tool.id] || { bg: 'var(--surface-2)', color: 'var(--primary)', glow: '' };
-            return (
-              <Link
-                key={tool.id}
-                to={tool.path}
-                className="tool-card"
-                role="listitem"
-                aria-label={`${tool.title}: ${tool.description}`}
-              >
-                <div
-                  className="tool-card-icon"
-                  aria-hidden="true"
-                  style={{ background: theme.bg, color: theme.color, boxShadow: `0 4px 16px ${theme.glow}` }}
-                >
-                  {tool.icon}
+        {Object.entries(grouped).map(([cat, tools]) => (
+          tools.length > 0 && (
+            <div key={cat} className="category-section">
+              {(activeCategory === 'All' && !search) && (
+                <div className="category-section-header">
+                  <h2 className="category-section-title">{cat}</h2>
+                  <span className="category-section-count">{tools.length} tools</span>
                 </div>
-                <div className="tool-card-body">
-                  <h3>{tool.title}</h3>
-                  <p>{tool.description}</p>
-                </div>
-                <div className="tool-card-footer">
-                  {tool.isNew
-                    ? <span className="tag-new">New</span>
-                    : tool.isPrivate
-                      ? <span className="tag-private">Local</span>
-                      : <span className="tag-cloud">Cloud</span>
-                  }
-                  <ChevronRight size={16} style={{ color: 'var(--text-muted)' }} aria-hidden="true" />
-                </div>
-              </Link>
-            );
-          })}
-        </div>
+              )}
+              <div className="tool-grid" role="list">
+                {tools.map(tool => (
+                  <Link
+                    key={tool.id}
+                    to={tool.path}
+                    className="tool-card"
+                    role="listitem"
+                    aria-label={`${tool.title}: ${tool.description}`}
+                  >
+                    <div
+                      className="tool-card-icon"
+                      aria-hidden="true"
+                      style={{ background: tool.bg, color: tool.color, boxShadow: `0 4px 16px ${tool.glow}` }}
+                    >
+                      {tool.icon}
+                    </div>
+                    <div className="tool-card-body">
+                      <h3>{tool.title}</h3>
+                      <p>{tool.description}</p>
+                    </div>
+                    <div className="tool-card-footer">
+                      {tool.isNew
+                        ? <span className="tag-new">New</span>
+                        : <span className="tag-private">Local</span>
+                      }
+                      <ChevronRight size={16} style={{ color: 'var(--text-muted)' }} aria-hidden="true" />
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )
+        ))}
+        {filtered.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '4rem 1rem', color: 'var(--text-muted)' }}>
+            <Search size={48} style={{ opacity: 0.3, marginBottom: '1rem' }} />
+            <p>No tools found for "<strong style={{ color: 'var(--text-secondary)' }}>{search}</strong>"</p>
+          </div>
+        )}
       </main>
 
       {/* Features */}
@@ -386,20 +551,44 @@ export default function App() {
     <Router>
       <Navbar />
       <Routes>
-        <Route path="/"              element={<Home />} />
-        <Route path="/viewer"        element={<ToolWrapper title="PDF Viewer"><PdfViewerTool /></ToolWrapper>} />
-        <Route path="/edit-pdf"      element={<ToolWrapper title="Edit PDF"><EditPdfTool /></ToolWrapper>} />
-        <Route path="/ocr"           element={<ToolWrapper title="OCR — Extract Text"><OcrTool /></ToolWrapper>} />
-        <Route path="/compress"      element={<ToolWrapper title="Compress PDF & Images"><CompressorTool /></ToolWrapper>} />
-        <Route path="/merge"         element={<ToolWrapper title="Merge PDF"><MergeTool /></ToolWrapper>} />
-        <Route path="/split"         element={<ToolWrapper title="Split & Organize"><SplitTool /></ToolWrapper>} />
-        <Route path="/protect"       element={<ToolWrapper title="Protect PDF"><ProtectTool /></ToolWrapper>} />
-        <Route path="/sign"          element={<ToolWrapper title="Sign PDF"><SignTool /></ToolWrapper>} />
-        <Route path="/image-to-pdf"  element={<ToolWrapper title="Image to PDF"><ImageToPdfTool /></ToolWrapper>} />
-        <Route path="/extract-images"element={<ToolWrapper title="Extract Images"><ExtractImagesTool /></ToolWrapper>} />
-        <Route path="/rotate"        element={<ToolWrapper title="Rotate PDF"><RotateTool /></ToolWrapper>} />
-        <Route path="/word-to-pdf"   element={<ToolWrapper title="Word to PDF"><WordToPdfTool /></ToolWrapper>} />
-        <Route path="*"              element={<Home />} />
+        <Route path="/"                  element={<Home />} />
+        {/* Viewer & OCR */}
+        <Route path="/viewer"            element={<ToolWrapper title="PDF Viewer"><PdfViewerTool /></ToolWrapper>} />
+        <Route path="/ocr"               element={<ToolWrapper title="OCR — Extract Text"><OcrTool /></ToolWrapper>} />
+        {/* Organize */}
+        <Route path="/merge"             element={<ToolWrapper title="Merge PDF"><MergeTool /></ToolWrapper>} />
+        <Route path="/split"             element={<ToolWrapper title="Split PDF"><SplitTool /></ToolWrapper>} />
+        <Route path="/remove-pages"      element={<ToolWrapper title="Remove Pages"><RemovePagesTool /></ToolWrapper>} />
+        <Route path="/extract-pages"     element={<ToolWrapper title="Extract Pages"><ExtractPagesTool /></ToolWrapper>} />
+        <Route path="/organize"          element={<ToolWrapper title="Organize PDF"><OrganizeTool /></ToolWrapper>} />
+        <Route path="/rotate"            element={<ToolWrapper title="Rotate PDF"><RotateTool /></ToolWrapper>} />
+        {/* Optimize */}
+        <Route path="/compress"          element={<ToolWrapper title="Compress PDF & Images"><CompressorTool /></ToolWrapper>} />
+        <Route path="/repair"            element={<ToolWrapper title="Repair PDF"><RepairTool /></ToolWrapper>} />
+        {/* Convert to PDF */}
+        <Route path="/image-to-pdf"      element={<ToolWrapper title="JPG to PDF"><ImageToPdfTool /></ToolWrapper>} />
+        <Route path="/word-to-pdf"       element={<ToolWrapper title="Word to PDF"><WordToPdfTool /></ToolWrapper>} />
+        <Route path="/ppt-to-pdf"        element={<ToolWrapper title="PowerPoint to PDF"><ComingSoonTool toolName="PowerPoint to PDF" description="Convert .pptx presentations to PDF format with full layout fidelity." /></ToolWrapper>} />
+        <Route path="/excel-to-pdf"      element={<ToolWrapper title="Excel to PDF"><ComingSoonTool toolName="Excel to PDF" description="Convert .xlsx spreadsheets to PDF format, preserving tables and formatting." /></ToolWrapper>} />
+        <Route path="/html-to-pdf"       element={<ToolWrapper title="HTML to PDF"><HtmlToPdfTool /></ToolWrapper>} />
+        {/* Convert from PDF */}
+        <Route path="/pdf-to-jpg"        element={<ToolWrapper title="PDF to JPG"><PdfToJpgTool /></ToolWrapper>} />
+        <Route path="/pdf-to-word"       element={<ToolWrapper title="PDF to Word"><ComingSoonTool toolName="PDF to Word" description="Convert PDF documents to editable .docx files with layout preservation." /></ToolWrapper>} />
+        <Route path="/pdf-to-ppt"        element={<ToolWrapper title="PDF to PowerPoint"><ComingSoonTool toolName="PDF to PowerPoint" description="Convert PDF pages into .pptx presentation slides." /></ToolWrapper>} />
+        <Route path="/pdf-to-excel"      element={<ToolWrapper title="PDF to Excel"><ComingSoonTool toolName="PDF to Excel" description="Extract tables from PDF into editable .xlsx spreadsheets." /></ToolWrapper>} />
+        <Route path="/pdf-to-pdfa"       element={<ToolWrapper title="PDF to PDF/A"><PdfToPdfATool /></ToolWrapper>} />
+        {/* Edit PDF */}
+        <Route path="/edit-pdf"          element={<ToolWrapper title="Edit PDF"><EditPdfTool /></ToolWrapper>} />
+        <Route path="/add-page-numbers"  element={<ToolWrapper title="Add Page Numbers"><AddPageNumbersTool /></ToolWrapper>} />
+        <Route path="/watermark"         element={<ToolWrapper title="Add Watermark"><WatermarkTool /></ToolWrapper>} />
+        <Route path="/extract-images"    element={<ToolWrapper title="Extract Images"><ExtractImagesTool /></ToolWrapper>} />
+        {/* Security */}
+        <Route path="/sign"              element={<ToolWrapper title="Sign PDF"><SignTool /></ToolWrapper>} />
+        <Route path="/protect"           element={<ToolWrapper title="Protect PDF"><ProtectTool /></ToolWrapper>} />
+        <Route path="/unlock"            element={<ToolWrapper title="Unlock PDF"><UnlockTool /></ToolWrapper>} />
+        <Route path="/redact"            element={<ToolWrapper title="Redact PDF"><RedactTool /></ToolWrapper>} />
+        <Route path="/compare"           element={<ToolWrapper title="Compare PDF"><CompareTool /></ToolWrapper>} />
+        <Route path="*"                  element={<Home />} />
       </Routes>
     </Router>
   );

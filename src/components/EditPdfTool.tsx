@@ -476,7 +476,6 @@ export default function EditPdfTool() {
       {/* ── Canvas Area ── */}
       <div
         style={{
-          position: 'relative',
           background: '#525659',
           borderRadius: 'var(--radius)',
           overflow: 'auto',
@@ -492,40 +491,41 @@ export default function EditPdfTool() {
       >
         {isRendering && (
           <div style={{
-            position: 'absolute', inset: 0,
+            position: 'fixed',
+            top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(0,0,0,0.4)', zIndex: 10, borderRadius: 'inherit',
+            background: 'rgba(0,0,0,0.5)', borderRadius: 8, padding: '1rem',
+            zIndex: 10,
           }}>
             <Loader2 size={36} className="spinner" color="white" />
           </div>
         )}
 
-        {/* PDF render canvas */}
-        <canvas
-          ref={canvasRef}
-          style={{ position: 'absolute', top: '1.5rem', left: '50%', transform: 'translateX(-50%)', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}
-          aria-hidden="true"
-        />
+        {/* Wrapper keeps canvases stacked; sets the natural scroll height */}
+        <div style={{ position: 'relative', flexShrink: 0, boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
+          {/* PDF render canvas */}
+          <canvas
+            ref={canvasRef}
+            style={{ display: 'block' }}
+            aria-hidden="true"
+          />
 
-        {/* Annotation overlay canvas */}
-        <canvas
-          ref={overlayRef}
-          style={{
-            position: 'absolute', top: '1.5rem', left: '50%', transform: 'translateX(-50%)',
-            cursor: activeTool === 'none' ? 'default' : activeTool === 'text' ? 'text' : 'crosshair',
-            zIndex: 5,
-          }}
-          onMouseDown={onMouseDown}
-          onMouseMove={onMouseMove}
-          onMouseUp={onMouseUp}
-          onMouseLeave={onMouseUp}
-          aria-label={`Annotation layer — active tool: ${activeTool}`}
-          role="img"
-          tabIndex={0}
-        />
-
-        {/* Spacer to correct scroll height */}
-        <canvas ref={canvasRef} style={{ visibility: 'hidden' }} aria-hidden="true" />
+          {/* Annotation overlay canvas — sits exactly on top */}
+          <canvas
+            ref={overlayRef}
+            style={{
+              position: 'absolute', top: 0, left: 0,
+              cursor: activeTool === 'none' ? 'default' : activeTool === 'text' ? 'text' : 'crosshair',
+            }}
+            onMouseDown={onMouseDown}
+            onMouseMove={onMouseMove}
+            onMouseUp={onMouseUp}
+            onMouseLeave={onMouseUp}
+            aria-label={`Annotation layer — active tool: ${activeTool}`}
+            role="img"
+            tabIndex={0}
+          />
+        </div>
       </div>
     </div>
   );

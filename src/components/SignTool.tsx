@@ -74,7 +74,7 @@ export default function SignTool() {
     if (pdfDocRef.current) renderPage(pdfDocRef.current, currentPage);
   }, [currentPage, renderPage]);
 
-  // ── Draggable signature ──────────────────────────────────────────
+  // ── Draggable signature — uses window listeners to capture fast moves ──
   const onSigMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     const sigEl = sigImgRef.current;
@@ -84,22 +84,33 @@ export default function SignTool() {
     setIsDraggingSig(true);
   };
 
-  const onContainerMouseMove = (e: React.MouseEvent) => {
-    if (!isDraggingSig || !containerRef.current || !sigImgRef.current) return;
-    e.preventDefault();
-    const containerRect = containerRef.current.getBoundingClientRect();
-    const sigRect = sigImgRef.current.getBoundingClientRect();
-    let x = (e.clientX - containerRect.left - dragOffset.x) / containerRect.width;
-    let y = (e.clientY - containerRect.top  - dragOffset.y) / containerRect.height;
-    // Clamp so signature stays inside
-    const maxX = 1 - sigRect.width  / containerRect.width;
-    const maxY = 1 - sigRect.height / containerRect.height;
-    x = Math.max(0, Math.min(maxX, x));
-    y = Math.max(0, Math.min(maxY, y));
-    setSigPos({ x, y });
-  };
+  // Attach window-level listeners only while dragging so fast mouse moves are never lost
+  useEffect(() => {
+    if (!isDraggingSig) return;
 
-  const stopDragging = () => setIsDraggingSig(false);
+    const handleMove = (e: MouseEvent) => {
+      if (!containerRef.current || !sigImgRef.current) return;
+      e.preventDefault();
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const sigRect       = sigImgRef.current.getBoundingClientRect();
+      let x = (e.clientX - containerRect.left - dragOffset.x) / containerRect.width;
+      let y = (e.clientY - containerRect.top  - dragOffset.y) / containerRect.height;
+      const maxX = 1 - sigRect.width  / containerRect.width;
+      const maxY = 1 - sigRect.height / containerRect.height;
+      x = Math.max(0, Math.min(maxX, x));
+      y = Math.max(0, Math.min(maxY, y));
+      setSigPos({ x, y });
+    };
+
+    const handleUp = () => setIsDraggingSig(false);
+
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup',  handleUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup',  handleUp);
+    };
+  }, [isDraggingSig, dragOffset]);
 
   // ── Signature canvas ─────────────────────────────────────────────
   const clearSignature = () => { sigCanvas.current?.clear(); setSignatureData(null); };
@@ -274,9 +285,6 @@ export default function SignTool() {
             className="preview-panel-body"
             style={{ height: 560, position: 'relative', overflow: 'hidden', padding: 0 }}
             ref={containerRef}
-            onMouseMove={onContainerMouseMove}
-            onMouseUp={stopDragging}
-            onMouseLeave={stopDragging}
           >
             {pageDataUrl ? (
               <>
