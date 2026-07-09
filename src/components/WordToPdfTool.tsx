@@ -27,7 +27,8 @@ export default function WordToPdfTool() {
     const formData = new FormData();
     formData.append('file', file);
     try {
-      const response = await fetch('http://localhost:3001/api/convert/word-to-pdf', {
+      const apiHost = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+      const response = await fetch(`${apiHost}/api/convert/word-to-pdf`, {
         method: 'POST',
         body: formData,
       });

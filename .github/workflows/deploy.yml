@@ -42,6 +42,7 @@ jobs:
           # Automatically injects the GitHub repository name as the base path prefix
           # e.g., /repository-name/ for GitHub Pages
           VITE_BASE_PATH: /${{ github.event.repository.name }}/
+          VITE_API_URL: https://pdfmaster-backend-thhj.onrender.com
         run: npm run build
 
       - name: Upload artifact
