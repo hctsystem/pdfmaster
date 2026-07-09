@@ -9,9 +9,6 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   import.meta.url
 ).toString();
 
-// Signature display width in the overlay (px)
-const SIG_W = 180;
-
 export default function SignTool() {
   const [file, setFile]                   = useState<File | null>(null);
   const [isProcessing, setIsProcessing]   = useState(false);
@@ -27,10 +24,14 @@ export default function SignTool() {
   const [isDraggingSig, setIsDraggingSig] = useState(false);
   const [dragOffset, setDragOffset]       = useState({ x: 0, y: 0 });
 
+  // Customization States
+  const [sigWidth, setSigWidth]           = useState(180); // adjustable signature display width (px)
+  const [penColor, setPenColor]           = useState('#1e293b'); // pen color: slate, blue, red
+  const [penWidth, setPenWidth]           = useState(3); // pen thickness
+
   const pdfDocRef    = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
   const sigCanvas    = useRef<SignatureCanvas>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  // containerRef wraps ONLY the img — its clientWidth/clientHeight = rendered page px
   const containerRef = useRef<HTMLDivElement>(null);
   const sigImgRef    = useRef<HTMLImageElement>(null);
 
@@ -109,11 +110,26 @@ export default function SignTool() {
 
   // ── Signature canvas ────────────────────────────────────────────
   const clearSignature = () => { sigCanvas.current?.clear(); };
+  
   const saveSignature  = () => {
-    if (sigCanvas.current?.isEmpty()) return;
-    setSignatureData(sigCanvas.current?.getTrimmedCanvas().toDataURL('image/png') ?? null);
-    setSigPos({ x: 40, y: 40 });
-    setShowModal(false);
+    const canvas = sigCanvas.current;
+    if (!canvas) return;
+    
+    // Fallback if isEmpty() fails or is buggy on some devices
+    let dataUrl: string | null = null;
+    try {
+      // getTrimmedCanvas drops outer empty spaces
+      dataUrl = canvas.getTrimmedCanvas().toDataURL('image/png');
+    } catch {
+      // fallback to full canvas
+      dataUrl = canvas.getCanvas().toDataURL('image/png');
+    }
+    
+    if (dataUrl) {
+      setSignatureData(dataUrl);
+      setSigPos({ x: 40, y: 40 });
+      setShowModal(false);
+    }
   };
 
   // ── Stamp signature onto PDF and download ───────────────────────
@@ -133,14 +149,14 @@ export default function SignTool() {
       // Signature natural size for aspect ratio
       const sigNatW = sigImgRef.current.naturalWidth;
       const sigNatH = sigImgRef.current.naturalHeight;
-      const sigDisplayH = sigNatW > 0 ? (SIG_W * sigNatH / sigNatW) : SIG_W / 4;
+      const sigDisplayH = sigNatW > 0 ? (sigWidth * sigNatH / sigNatW) : sigWidth / 4;
 
       // Scale screen pixels → PDF units
       const { width: pdfW, height: pdfH } = page.getSize();
       const scaleX  = pdfW / renderW;
       const scaleY  = pdfH / renderH;
 
-      const pdfSigW = SIG_W       * scaleX;
+      const pdfSigW = sigWidth    * scaleX;
       const pdfSigH = sigDisplayH * scaleY;
 
       // sigPos.y is pixels from top in screen space; PDF y goes from bottom
@@ -177,8 +193,8 @@ export default function SignTool() {
 
   // Compute displayed signature height for absolute positioning
   const sigDisplayH = sigImgRef.current && sigImgRef.current.naturalWidth > 0
-    ? SIG_W * sigImgRef.current.naturalHeight / sigImgRef.current.naturalWidth
-    : SIG_W / 4;
+    ? sigWidth * sigImgRef.current.naturalHeight / sigImgRef.current.naturalWidth
+    : sigWidth / 4;
 
   return (
     <>
@@ -264,10 +280,30 @@ export default function SignTool() {
                     <PenTool size={18} /> Draw Signature
                   </button>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                     <div style={{ background: 'white', borderRadius: 'var(--radius-sm)', padding: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border)' }}>
                       <img src={signatureData} alt="Your saved signature preview" style={{ maxHeight: 60, maxWidth: '100%' }} />
                     </div>
+
+                    {/* Signature stamp width customization */}
+                    <div>
+                      <label htmlFor="sig-size-slider" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.375rem' }}>
+                        <span>Signature Width</span>
+                        <span style={{ color: 'var(--primary)', fontFamily: 'monospace' }}>{sigWidth}px</span>
+                      </label>
+                      <input
+                        id="sig-size-slider"
+                        type="range"
+                        min={60}
+                        max={400}
+                        step={10}
+                        value={sigWidth}
+                        onChange={e => setSigWidth(Number(e.target.value))}
+                        style={{ width: '100%', cursor: 'pointer' }}
+                        aria-label="Adjust signature width"
+                      />
+                    </div>
+
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                       <button
                         className="btn-ghost"
@@ -346,7 +382,7 @@ export default function SignTool() {
                       position: 'absolute',
                       left: `${sigPos.x}px`,
                       top:  `${sigPos.y}px`,
-                      width: `${SIG_W}px`,
+                      width: `${sigWidth}px`,
                       height: `${sigDisplayH}px`,
                       cursor: isDraggingSig ? 'grabbing' : 'grab',
                       filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.35))',
@@ -383,19 +419,70 @@ export default function SignTool() {
                 <X size={16} />
               </button>
             </div>
+            
             <div className="modal-body">
               <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-                Draw your signature below. After saving, drag it into position on the PDF preview.
+                Draw your signature below. Adjust the pen options to customize.
               </p>
+              
+              {/* Pen Settings Controls */}
+              <div style={{ display: 'flex', gap: '1.25rem', marginBottom: '1rem', alignItems: 'center' }}>
+                <div>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.375rem' }}>Pen Color</span>
+                  <div style={{ display: 'flex', gap: '0.375rem' }}>
+                    {[
+                      { hex: '#1e293b', name: 'Black' },
+                      { hex: '#2563eb', name: 'Blue' },
+                      { hex: '#dc2626', name: 'Red' },
+                    ].map(c => (
+                      <button
+                        key={c.hex}
+                        onClick={() => setPenColor(c.hex)}
+                        aria-label={`Select ${c.name} pen color`}
+                        style={{
+                          width: 24, height: 24, borderRadius: '50%',
+                          background: c.hex, cursor: 'pointer',
+                          border: penColor === c.hex ? '2px solid var(--primary)' : '1px solid var(--border)',
+                          transform: penColor === c.hex ? 'scale(1.15)' : 'none',
+                          transition: 'all 150ms',
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="pen-width-select" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.375rem' }}>Pen Thickness</label>
+                  <select
+                    id="pen-width-select"
+                    value={penWidth}
+                    onChange={e => setPenWidth(Number(e.target.value))}
+                    style={{
+                      padding: '0.25rem 0.5rem', background: 'var(--surface-2)',
+                      border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
+                      color: 'var(--text-main)', fontSize: '0.75rem', cursor: 'pointer'
+                    }}
+                    aria-label="Select pen thickness"
+                  >
+                    <option value={1}>Thin (1px)</option>
+                    <option value={3}>Medium (3px)</option>
+                    <option value={5}>Thick (5px)</option>
+                  </select>
+                </div>
+              </div>
+
               <div style={{ background: 'white', borderRadius: 'var(--radius-sm)', overflow: 'hidden', border: '1px solid var(--border)' }}>
                 <SignatureCanvas
                   ref={sigCanvas}
                   canvasProps={{ width: 476, height: 200, className: 'sigCanvas' }}
                   backgroundColor="rgba(255,255,255,1)"
-                  penColor="#1e293b"
+                  penColor={penColor}
+                  minWidth={penWidth - 0.5}
+                  maxWidth={penWidth + 0.5}
                 />
               </div>
             </div>
+
             <div className="modal-footer">
               <button className="btn-ghost" onClick={clearSignature} aria-label="Clear the canvas">
                 <Trash2 size={14} /> Clear
