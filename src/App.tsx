@@ -10,7 +10,7 @@ import {
   FileSearch, ChevronRight, Scissors, LayoutGrid,
   Wrench, Archive, Printer, Hash, Droplets, Unlock,
   EyeOff, Search, FileImage, FileX,
-  FileOutput, Layers, Columns2
+  FileOutput, Layers, Columns2, QrCode, Wifi, User, Camera
 } from 'lucide-react';
 
 import CompressorTool     from './components/CompressorTool';
@@ -38,6 +38,7 @@ import UnlockTool         from './components/UnlockTool';
 import RedactTool         from './components/RedactTool';
 import CompareTool        from './components/CompareTool';
 import ComingSoonTool     from './components/ComingSoonTool';
+import QrToolsPage       from './components/QrToolsPage';
 import DeveloperModal    from './components/DeveloperModal';
 
 import './App.css';
@@ -453,6 +454,65 @@ function Home() {
         )}
       </main>
 
+      {/* QR Code Tools Promo Section */}
+      <section style={{ padding: '0 1.5rem 3rem', maxWidth: 1200, margin: '0 auto' }}>
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(124,58,237,0.12) 0%, rgba(59,130,246,0.12) 100%)',
+          border: '1px solid rgba(124,58,237,0.25)',
+          borderRadius: 'var(--radius-lg)',
+          padding: '2rem 2.5rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '2rem',
+          flexWrap: 'wrap',
+        }}>
+          <div style={{
+            width: 64, height: 64, borderRadius: 'var(--radius)',
+            background: 'linear-gradient(135deg, #7C3AED, #3B82F6)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            boxShadow: '0 8px 24px rgba(124,58,237,0.4)',
+          }} aria-hidden="true">
+            <QrCode size={30} color="#fff" />
+          </div>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)' }}>QR Code Tools</h2>
+              <span style={{ background: 'linear-gradient(135deg, #7C3AED, #3B82F6)', color: '#fff', fontSize: '0.6875rem', fontWeight: 700, padding: '0.2rem 0.6rem', borderRadius: 999, letterSpacing: '0.04em' }}>NEW</span>
+            </div>
+            <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+              Generate, customize and scan QR codes — URL, WiFi, contacts, and more. Plus a live camera scanner.
+            </p>
+            <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.875rem', flexWrap: 'wrap' }}>
+              {[
+                { icon: <QrCode size={13} />, label: 'Generate QR' },
+                { icon: <Wifi size={13} />, label: 'WiFi QR' },
+                { icon: <User size={13} />, label: 'vCard QR' },
+                { icon: <Camera size={13} />, label: 'Camera Scan' },
+              ].map(f => (
+                <span key={f.label} style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8125rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                  <span style={{ color: '#7C3AED' }}>{f.icon}</span>{f.label}
+                </span>
+              ))}
+            </div>
+          </div>
+          <Link
+            to="/qr"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
+              padding: '0.75rem 1.5rem',
+              background: 'linear-gradient(135deg, #7C3AED, #3B82F6)',
+              color: 'white', borderRadius: 'var(--radius-sm)',
+              textDecoration: 'none', fontWeight: 700, fontSize: '0.9375rem',
+              boxShadow: '0 4px 16px rgba(124,58,237,0.35)',
+              transition: 'all 150ms', whiteSpace: 'nowrap', flexShrink: 0,
+            }}
+            aria-label="Open QR Code Tools"
+          >
+            Open QR Tools <ChevronRight size={16} />
+          </Link>
+        </div>
+      </section>
+
       {/* Features */}
       <section className="features-section" aria-labelledby="features-heading">
         <div className="features-grid">
@@ -546,6 +606,13 @@ function Home() {
             >
               Report a Bug
             </button>
+            <span style={{ color: 'var(--border)' }}>•</span>
+            <Link
+              to="/qr"
+              style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit', textDecoration: 'none', fontSize: '0.8125rem' }}
+            >
+              QR Code Tools
+            </Link>
           </div>
           <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
             &copy; {new Date().getFullYear()} PDFMaster. Built with React, pdf-lib, Tesseract.js &amp; pdfjs-dist.
@@ -617,6 +684,8 @@ export default function App() {
         <Route path="/unlock"            element={<ToolWrapper title="Unlock PDF"><UnlockTool /></ToolWrapper>} />
         <Route path="/redact"            element={<ToolWrapper title="Redact PDF"><RedactTool /></ToolWrapper>} />
         <Route path="/compare"           element={<ToolWrapper title="Compare PDF"><CompareTool /></ToolWrapper>} />
+        {/* QR Code Tools */}
+        <Route path="/qr"                element={<ToolWrapper title="QR Code Tools"><QrToolsPage /></ToolWrapper>} />
         <Route path="*"                  element={<Home />} />
       </Routes>
       <DeveloperModal />

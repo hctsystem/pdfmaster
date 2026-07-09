@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Loader2, PenTool, Trash2, X, Check, FileText, Move } from 'lucide-react';
-import { PDFDocument, degrees } from 'pdf-lib';
+import { Loader2, PenTool, Trash2, Check, FileText, Move, X } from 'lucide-react';
+import { PDFDocument } from 'pdf-lib';
 import SignatureCanvas from 'react-signature-canvas';
 import * as pdfjsLib from 'pdfjs-dist';
 
@@ -9,33 +9,32 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   import.meta.url
 ).toString();
 
-interface SigPos {
-  x: number; // fraction of container width (0–1)
-  y: number; // fraction of container height (0–1)
-}
+// Signature display width in the overlay (px)
+const SIG_W = 180;
 
 export default function SignTool() {
-  const [file, setFile]               = useState<File | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [isDragging, setIsDragging]     = useState(false);
-  const [showSignModal, setShowSignModal] = useState(false);
+  const [file, setFile]                   = useState<File | null>(null);
+  const [isProcessing, setIsProcessing]   = useState(false);
+  const [isDragging, setIsDragging]       = useState(false);
+  const [showModal, setShowModal]         = useState(false);
   const [signatureData, setSignatureData] = useState<string | null>(null);
-  const [isRendering, setIsRendering]   = useState(false);
-  const [pageDataUrl, setPageDataUrl]   = useState<string | null>(null);
-  const [pageCount, setPageCount]       = useState(0);
-  const [currentPage, setCurrentPage]   = useState(1);
-  const [sigPos, setSigPos]             = useState<SigPos>({ x: 0.55, y: 0.78 });
+  const [isRendering, setIsRendering]     = useState(false);
+  const [pageDataUrl, setPageDataUrl]     = useState<string | null>(null);
+  const [pageCount, setPageCount]         = useState(0);
+  const [currentPage, setCurrentPage]     = useState(1);
+  // sigPos: pixels from top-left of the containerRef div
+  const [sigPos, setSigPos]               = useState({ x: 40, y: 40 });
   const [isDraggingSig, setIsDraggingSig] = useState(false);
-  const [dragOffset, setDragOffset]     = useState({ x: 0, y: 0 });
+  const [dragOffset, setDragOffset]       = useState({ x: 0, y: 0 });
 
-  // pdfjs document reference
   const pdfDocRef    = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
   const sigCanvas    = useRef<SignatureCanvas>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // containerRef wraps ONLY the img — its clientWidth/clientHeight = rendered page px
   const containerRef = useRef<HTMLDivElement>(null);
   const sigImgRef    = useRef<HTMLImageElement>(null);
 
-  // ── Load and render PDF ──────────────────────────────────────────
+  // ── Render a PDF page to a data URL ─────────────────────────────
   const renderPage = useCallback(async (doc: pdfjsLib.PDFDocumentProxy, pageNum: number) => {
     setIsRendering(true);
     try {
@@ -45,7 +44,7 @@ export default function SignTool() {
       canvas.width  = viewport.width;
       canvas.height = viewport.height;
       const ctx = canvas.getContext('2d')!;
-      await page.render({ canvasContext: ctx as any, viewport, canvas }).promise;
+      await page.render({ canvasContext: ctx as unknown as CanvasRenderingContext2D, viewport, canvas }).promise;
       setPageDataUrl(canvas.toDataURL('image/jpeg', 0.85));
     } catch (err) {
       console.error('Render error:', err);
@@ -62,9 +61,8 @@ export default function SignTool() {
     setPageDataUrl(null);
     setCurrentPage(1);
 
-    const arrayBuffer = await f.arrayBuffer();
-    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
-    const doc = await loadingTask.promise;
+    const buf = await f.arrayBuffer();
+    const doc = await pdfjsLib.getDocument({ data: buf }).promise;
     pdfDocRef.current = doc;
     setPageCount(doc.numPages);
     renderPage(doc, 1);
@@ -74,121 +72,98 @@ export default function SignTool() {
     if (pdfDocRef.current) renderPage(pdfDocRef.current, currentPage);
   }, [currentPage, renderPage]);
 
-  // ── Draggable signature — uses window listeners to capture fast moves ──
-  const onSigMouseDown = (e: React.MouseEvent) => {
+  // ── Pointer-based drag (works for mouse and touch) ──────────────
+  const onPointerDown = (e: React.PointerEvent) => {
     e.preventDefault();
     const sigEl = sigImgRef.current;
     if (!sigEl) return;
     const rect = sigEl.getBoundingClientRect();
     setDragOffset({ x: e.clientX - rect.left, y: e.clientY - rect.top });
     setIsDraggingSig(true);
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
   };
 
-  // Attach window-level listeners only while dragging so fast mouse moves are never lost
-  useEffect(() => {
-    if (!isDraggingSig) return;
-
-    const handleMove = (e: MouseEvent) => {
-      if (!containerRef.current || !sigImgRef.current) return;
-      e.preventDefault();
-      const containerRect = containerRef.current.getBoundingClientRect();
-      const sigRect       = sigImgRef.current.getBoundingClientRect();
-      let x = (e.clientX - containerRect.left - dragOffset.x) / containerRect.width;
-      let y = (e.clientY - containerRect.top  - dragOffset.y) / containerRect.height;
-      const maxX = 1 - sigRect.width  / containerRect.width;
-      const maxY = 1 - sigRect.height / containerRect.height;
-      x = Math.max(0, Math.min(maxX, x));
-      y = Math.max(0, Math.min(maxY, y));
-      setSigPos({ x, y });
-    };
-
-    const handleUp = () => setIsDraggingSig(false);
-
-    window.addEventListener('mousemove', handleMove);
-    window.addEventListener('mouseup',  handleUp);
-    return () => {
-      window.removeEventListener('mousemove', handleMove);
-      window.removeEventListener('mouseup',  handleUp);
-    };
+  const onPointerMove = useCallback((e: PointerEvent) => {
+    if (!isDraggingSig || !containerRef.current || !sigImgRef.current) return;
+    e.preventDefault();
+    const cRect = containerRef.current.getBoundingClientRect();
+    const sigEl = sigImgRef.current.getBoundingClientRect();
+    let x = e.clientX - cRect.left - dragOffset.x;
+    let y = e.clientY - cRect.top  - dragOffset.y;
+    x = Math.max(0, Math.min(cRect.width  - sigEl.width,  x));
+    y = Math.max(0, Math.min(cRect.height - sigEl.height, y));
+    setSigPos({ x, y });
   }, [isDraggingSig, dragOffset]);
 
-  // ── Signature canvas ─────────────────────────────────────────────
-  const clearSignature = () => { sigCanvas.current?.clear(); setSignatureData(null); };
+  const onPointerUp = useCallback(() => setIsDraggingSig(false), []);
+
+  useEffect(() => {
+    if (!isDraggingSig) return;
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup',   onPointerUp);
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup',   onPointerUp);
+    };
+  }, [isDraggingSig, onPointerMove, onPointerUp]);
+
+  // ── Signature canvas ────────────────────────────────────────────
+  const clearSignature = () => { sigCanvas.current?.clear(); };
   const saveSignature  = () => {
     if (sigCanvas.current?.isEmpty()) return;
-    setSignatureData(sigCanvas.current?.getTrimmedCanvas().toDataURL('image/png') || null);
-    setShowSignModal(false);
+    setSignatureData(sigCanvas.current?.getTrimmedCanvas().toDataURL('image/png') ?? null);
+    setSigPos({ x: 40, y: 40 });
+    setShowModal(false);
   };
 
-  // ── Save signed PDF ──────────────────────────────────────────────
+  // ── Stamp signature onto PDF and download ───────────────────────
   const signPdf = async () => {
-    if (!file || !signatureData || !containerRef.current) return;
+    if (!file || !signatureData || !containerRef.current || !sigImgRef.current) return;
     setIsProcessing(true);
     try {
-      const bytes = await file.arrayBuffer();
-      const pdf = await PDFDocument.load(bytes);
-      const pages = pdf.getPages();
-      const targetPage = pages[currentPage - 1] ?? pages[pages.length - 1];
-      const { width: pdfW, height: pdfH } = targetPage.getSize();
-      const rotation = targetPage.getRotation().angle;
+      const bytes  = await file.arrayBuffer();
+      const pdfDoc = await PDFDocument.load(bytes);
+      const pages  = pdfDoc.getPages();
+      const page   = pages[currentPage - 1] ?? pages[pages.length - 1];
 
-      // Signature intrinsic size — scale to ~28% of visual page width
-      const sigImg    = sigImgRef.current!;
-      const sigAspect = sigImg.naturalWidth / sigImg.naturalHeight;
-      
-      const isRotated90or270 = (rotation === 90 || rotation === 270);
-      const visualW = isRotated90or270 ? pdfH : pdfW;
-      const visualH = isRotated90or270 ? pdfW : pdfH;
-      
-      const sigWpdf   = visualW * 0.28;
-      const sigHpdf   = sigWpdf / sigAspect;
+      // Rendered container size on screen
+      const renderW = containerRef.current.clientWidth;
+      const renderH = containerRef.current.clientHeight;
 
-      // Calculate visual coordinates (rx, ry)
-      const rx = sigPos.x * visualW;
-      const ry = visualH - sigPos.y * visualH - sigHpdf;
+      // Signature natural size for aspect ratio
+      const sigNatW = sigImgRef.current.naturalWidth;
+      const sigNatH = sigImgRef.current.naturalHeight;
+      const sigDisplayH = sigNatW > 0 ? (SIG_W * sigNatH / sigNatW) : SIG_W / 4;
 
-      // Map visual coordinates to physical PDF coordinates based on page rotation
-      let x: number;
-      let y: number;
-      let angle: number;
+      // Scale screen pixels → PDF units
+      const { width: pdfW, height: pdfH } = page.getSize();
+      const scaleX  = pdfW / renderW;
+      const scaleY  = pdfH / renderH;
 
-      if (rotation === 90) {
-        x = ry;
-        y = pdfW - rx - sigWpdf;
-        angle = -90;
-      } else if (rotation === 180) {
-        x = pdfW - rx - sigWpdf;
-        y = pdfH - ry - sigHpdf;
-        angle = -180;
-      } else if (rotation === 270) {
-        x = pdfH - ry - sigHpdf;
-        y = rx;
-        angle = -270;
-      } else {
-        // 0 degrees
-        x = rx;
-        y = ry;
-        angle = 0;
-      }
+      const pdfSigW = SIG_W       * scaleX;
+      const pdfSigH = sigDisplayH * scaleY;
 
-      const pngImage = await pdf.embedPng(signatureData);
-      targetPage.drawImage(pngImage, {
-        x: Math.max(0, Math.min(x, pdfW - (isRotated90or270 ? sigHpdf : sigWpdf))),
-        y: Math.max(0, Math.min(y, pdfH - (isRotated90or270 ? sigWpdf : sigHpdf))),
-        width: sigWpdf,
-        height: sigHpdf,
-        rotate: degrees(angle),
+      // sigPos.y is pixels from top in screen space; PDF y goes from bottom
+      const pdfX = sigPos.x * scaleX;
+      const pdfY = pdfH - (sigPos.y * scaleY) - pdfSigH;
+
+      const pngImg = await pdfDoc.embedPng(signatureData);
+      page.drawImage(pngImg, {
+        x: Math.max(0, Math.min(pdfX, pdfW - pdfSigW)),
+        y: Math.max(0, Math.min(pdfY, pdfH - pdfSigH)),
+        width:  pdfSigW,
+        height: pdfSigH,
       });
 
-      const signedBytes = await pdf.save();
-      const blob = new Blob([signedBytes as any], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const saved = await pdfDoc.save();
+      const blob  = new Blob([saved.buffer as ArrayBuffer], { type: 'application/pdf' });
+      const url   = URL.createObjectURL(blob);
+      const a     = document.createElement('a');
       a.href = url; a.download = `signed_${file.name}`; a.click();
       URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error(error);
-      alert('Failed to sign PDF.');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to sign PDF. Please try again.');
     } finally {
       setIsProcessing(false);
     }
@@ -197,9 +172,13 @@ export default function SignTool() {
   const reset = () => {
     setFile(null); setSignatureData(null); setPageDataUrl(null);
     setPageCount(0); setCurrentPage(1);
-    pdfDocRef.current?.cleanup();
     pdfDocRef.current = null;
   };
+
+  // Compute displayed signature height for absolute positioning
+  const sigDisplayH = sigImgRef.current && sigImgRef.current.naturalWidth > 0
+    ? SIG_W * sigImgRef.current.naturalHeight / sigImgRef.current.naturalWidth
+    : SIG_W / 4;
 
   return (
     <>
@@ -227,20 +206,21 @@ export default function SignTool() {
                 type="file" ref={fileInputRef} style={{ display: 'none' }}
                 onChange={e => e.target.files && handleFiles(e.target.files)}
                 accept="application/pdf"
-                aria-label="Select PDF to sign"
+                aria-label="Select PDF file to sign"
               />
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              {/* File info */}
               <div className="file-item">
                 <div className="file-info">
                   <PenTool size={18} color="var(--primary)" aria-hidden="true" />
                   <div className="file-details">
                     <h4>{file.name}</h4>
-                    <p>{(file.size / 1024).toFixed(0)} KB · {pageCount} pages</p>
+                    <p>{(file.size / 1024).toFixed(0)} KB · {pageCount} {pageCount === 1 ? 'page' : 'pages'}</p>
                   </div>
                 </div>
-                <button className="btn-icon" onClick={reset} aria-label="Remove file">
+                <button className="btn-icon" onClick={reset} aria-label="Remove file and start over">
                   <Trash2 size={15} />
                 </button>
               </div>
@@ -252,35 +232,54 @@ export default function SignTool() {
                     Sign on page
                   </label>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <button className="editor-tool-btn" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1} aria-label="Previous page">‹</button>
+                    <button
+                      className="editor-tool-btn"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage <= 1}
+                      aria-label="Previous page"
+                    >‹</button>
                     <span className="page-counter" aria-live="polite">{currentPage} / {pageCount}</span>
-                    <button className="editor-tool-btn" onClick={() => setCurrentPage(p => Math.min(pageCount, p + 1))} disabled={currentPage >= pageCount} aria-label="Next page">›</button>
+                    <button
+                      className="editor-tool-btn"
+                      onClick={() => setCurrentPage(p => Math.min(pageCount, p + 1))}
+                      disabled={currentPage >= pageCount}
+                      aria-label="Next page"
+                    >›</button>
                   </div>
                 </div>
               )}
 
-              {/* Signature */}
+              {/* Signature section */}
               <div>
                 <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
-                  Signature
+                  Your Signature
                 </label>
                 {!signatureData ? (
                   <button
                     className="btn-ghost"
                     style={{ width: '100%', padding: '1.5rem', border: '2px dashed var(--border)', borderRadius: 'var(--radius-sm)' }}
-                    onClick={() => setShowSignModal(true)}
-                    aria-label="Open signature pad to draw your signature"
+                    onClick={() => setShowModal(true)}
+                    aria-label="Open signature pad"
                   >
                     <PenTool size={18} /> Draw Signature
                   </button>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                     <div style={{ background: 'white', borderRadius: 'var(--radius-sm)', padding: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border)' }}>
-                      <img src={signatureData} alt="Your signature" style={{ maxHeight: 64, maxWidth: '100%' }} />
+                      <img src={signatureData} alt="Your saved signature preview" style={{ maxHeight: 60, maxWidth: '100%' }} />
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <button className="btn-ghost" onClick={clearSignature} style={{ flex: 1 }} aria-label="Clear signature"><Trash2 size={14} /> Clear</button>
-                      <button className="btn-ghost" onClick={() => setShowSignModal(true)} style={{ flex: 1 }} aria-label="Redraw signature"><PenTool size={14} /> Redraw</button>
+                      <button
+                        className="btn-ghost"
+                        onClick={() => { setSignatureData(null); setSigPos({ x: 40, y: 40 }); }}
+                        style={{ flex: 1 }}
+                        aria-label="Clear signature"
+                      >
+                        <Trash2 size={14} /> Clear
+                      </button>
+                      <button className="btn-ghost" onClick={() => setShowModal(true)} style={{ flex: 1 }} aria-label="Redraw signature">
+                        <PenTool size={14} /> Redraw
+                      </button>
                     </div>
                   </div>
                 )}
@@ -289,7 +288,7 @@ export default function SignTool() {
               {signatureData && (
                 <div style={{ background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: 'var(--radius-sm)', padding: '0.75rem 1rem', fontSize: '0.8125rem', color: 'var(--text-muted)', display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
                   <Move size={14} style={{ flexShrink: 0, marginTop: 1, color: 'var(--primary)' }} aria-hidden="true" />
-                  <span><strong style={{ color: 'var(--text-secondary)' }}>Drag</strong> the signature in the preview to position it exactly where you want.</span>
+                  <span><strong style={{ color: 'var(--text-secondary)' }}>Drag</strong> the signature in the preview panel to reposition it exactly where you want it.</span>
                 </div>
               )}
 
@@ -306,66 +305,54 @@ export default function SignTool() {
           )}
         </div>
 
-        {/* ── Preview Panel — PDF canvas + draggable signature ── */}
+        {/* ── Preview Panel ── */}
         <div className="tool-preview-panel">
           <div className="preview-panel-header">
-            <h4>{signatureData ? 'Drag signature to position' : 'PDF Preview'}</h4>
+            <h4>{signatureData ? 'Drag signature to reposition' : 'PDF Preview'}</h4>
             {isRendering && <Loader2 className="spinner" size={14} color="var(--primary)" />}
           </div>
           <div
             className="preview-panel-body"
-            style={{ 
-              height: 560, 
+            style={{
+              height: 560,
               background: '#525659',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               padding: '1.5rem',
               overflow: 'auto',
-              position: 'relative'
             }}
           >
             {pageDataUrl ? (
               <div
                 ref={containerRef}
-                style={{
-                  position: 'relative',
-                  boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-                  display: 'inline-block',
-                  lineHeight: 0
-                }}
+                style={{ position: 'relative', display: 'inline-block', lineHeight: 0, boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}
               >
-                {/* PDF page image */}
                 <img
                   src={pageDataUrl}
                   alt={`PDF page ${currentPage} preview`}
-                  style={{ 
-                    maxHeight: '520px', 
-                    width: 'auto', 
-                    display: 'block', 
-                    userSelect: 'none' 
-                  }}
+                  style={{ maxHeight: 520, width: 'auto', display: 'block', userSelect: 'none' }}
                   draggable={false}
                 />
 
-                {/* Draggable signature overlay */}
                 {signatureData && (
                   <img
                     ref={sigImgRef}
                     src={signatureData}
-                    alt="Signature — drag to reposition"
+                    alt="Your signature — drag to reposition"
                     draggable={false}
-                    onMouseDown={onSigMouseDown}
+                    onPointerDown={onPointerDown}
                     style={{
                       position: 'absolute',
-                      left: `${sigPos.x * 100}%`,
-                      top:  `${sigPos.y * 100}%`,
-                      width: '28%',
+                      left: `${sigPos.x}px`,
+                      top:  `${sigPos.y}px`,
+                      width: `${SIG_W}px`,
+                      height: `${sigDisplayH}px`,
                       cursor: isDraggingSig ? 'grabbing' : 'grab',
-                      filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.4))',
+                      filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.35))',
                       userSelect: 'none',
-                      transition: isDraggingSig ? 'none' : 'box-shadow 0.2s',
-                      outline: isDraggingSig ? '2px dashed var(--primary)' : '2px dashed transparent',
+                      touchAction: 'none',
+                      outline: isDraggingSig ? '2px dashed var(--primary)' : '2px dashed rgba(59,130,246,0.4)',
                       borderRadius: 4,
                     }}
                   />
@@ -386,29 +373,34 @@ export default function SignTool() {
         </div>
       </div>
 
-      {/* Signature modal */}
-      {showSignModal && (
-        <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Signature pad">
+      {/* ── Signature Drawing Modal ── */}
+      {showModal && (
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Draw your signature">
           <div className="modal-content" style={{ maxWidth: 520 }}>
             <div className="modal-header">
               <h3>Draw your signature</h3>
-              <button className="btn-icon" onClick={() => setShowSignModal(false)} aria-label="Close signature pad"><X size={16} /></button>
+              <button className="btn-icon" onClick={() => setShowModal(false)} aria-label="Close signature pad">
+                <X size={16} />
+              </button>
             </div>
             <div className="modal-body">
               <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-                Draw your signature below, then drag it to your desired position on the PDF.
+                Draw your signature below. After saving, drag it into position on the PDF preview.
               </p>
               <div style={{ background: 'white', borderRadius: 'var(--radius-sm)', overflow: 'hidden', border: '1px solid var(--border)' }}>
                 <SignatureCanvas
                   ref={sigCanvas}
                   canvasProps={{ width: 476, height: 200, className: 'sigCanvas' }}
                   backgroundColor="rgba(255,255,255,1)"
+                  penColor="#1e293b"
                 />
               </div>
             </div>
             <div className="modal-footer">
-              <button className="btn-ghost" onClick={clearSignature} aria-label="Clear the signature pad">Clear</button>
-              <button className="btn-primary" onClick={saveSignature} aria-label="Save signature">
+              <button className="btn-ghost" onClick={clearSignature} aria-label="Clear the canvas">
+                <Trash2 size={14} /> Clear
+              </button>
+              <button className="btn-primary" onClick={saveSignature} aria-label="Save the drawn signature">
                 <Check size={16} /> Save Signature
               </button>
             </div>
