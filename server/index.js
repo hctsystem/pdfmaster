@@ -5,7 +5,7 @@ const libre = require('libreoffice-convert');
 const path = require('path');
 const { promisify } = require('util');
 
-// Promisify convertWithOptions so we can pass fileName extension options
+// Promisify convertWithOptions so we can pass fileName extension options and soffice args
 const libreConvertAsync = promisify(libre.convertWithOptions);
 
 const app = express();
@@ -23,20 +23,59 @@ async function handleConversion(req, res, outputFormat) {
     return res.status(400).json({ error: 'No file uploaded.' });
   }
 
-  // Ensure format has no leading dot for LibreOffice filter matching (e.g. "docx" instead of ".docx")
+  // Ensure format has no leading dot (e.g. "docx" instead of ".docx")
   const format = outputFormat.replace(/^\./, '');
   const dotExt = `.${format}`;
 
   try {
     console.log(`Converting ${req.file.originalname} to format: ${format}...`);
     
-    // Convert document bytes using LibreOffice with correct source filename and extension
-    const convertedBuf = await libreConvertAsync(
-      req.file.buffer,
-      format,
-      undefined,
-      { fileName: req.file.originalname }
-    );
+    let convertedBuf;
+    
+    // Check if we are converting FROM a PDF to a spreadsheet (Excel)
+    const isPdfInput = req.file.originalname.toLowerCase().endsWith('.pdf');
+    
+    if (isPdfInput && format === 'xlsx') {
+      // ─── PDF to Excel: Two-Step Conversion ──────────────────────
+      // Step 1: Convert PDF to HTML (Draw layout to HTML page representation)
+      console.log('PDF to Excel: Step 1 (PDF -> HTML)...');
+      const htmlBuf = await libreConvertAsync(
+        req.file.buffer,
+        'html',
+        undefined,
+        { fileName: req.file.originalname }
+      );
+
+      // Step 2: Convert HTML to XLSX (Calc spreadsheet imports HTML tables)
+      console.log('PDF to Excel: Step 2 (HTML -> XLSX)...');
+      convertedBuf = await libreConvertAsync(
+        htmlBuf,
+        'xlsx',
+        undefined,
+        { fileName: 'data.html' }
+      );
+    } else {
+      // ─── Standard Conversions ───────────────────────────────────
+      // Add necessary import filters to force PDF files into correct editor applications
+      const sofficeAdditionalArgs = [];
+      if (isPdfInput) {
+        if (format === 'docx') {
+          sofficeAdditionalArgs.push('--infilter=writer_pdf_import');
+        } else if (format === 'pptx') {
+          sofficeAdditionalArgs.push('--infilter=impress_pdf_import');
+        }
+      }
+
+      convertedBuf = await libreConvertAsync(
+        req.file.buffer,
+        format,
+        undefined,
+        { 
+          fileName: req.file.originalname,
+          sofficeAdditionalArgs: sofficeAdditionalArgs
+        }
+      );
+    }
     
     // Retrieve root filename without the extension
     const baseName = path.parse(req.file.originalname).name;
