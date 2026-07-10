@@ -89,6 +89,9 @@ export default function DocumentConverterTool({
         try {
           const errData = await response.json();
           errMsg = errData.error || errMsg;
+          if (errData.details) {
+            errMsg += ` Details: ${errData.details}`;
+          }
         } catch {
           // ignore
         }
