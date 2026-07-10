@@ -18,18 +18,22 @@ const upload = multer({
 });
 
 // Reusable document conversion controller
-async function handleConversion(req, res, outputExt) {
+async function handleConversion(req, res, outputFormat) {
   if (!req.file) {
     return res.status(400).json({ error: 'No file uploaded.' });
   }
 
+  // Ensure format has no leading dot for LibreOffice filter matching (e.g. "docx" instead of ".docx")
+  const format = outputFormat.replace(/^\./, '');
+  const dotExt = `.${format}`;
+
   try {
-    console.log(`Converting ${req.file.originalname} to ${outputExt}...`);
+    console.log(`Converting ${req.file.originalname} to format: ${format}...`);
     
     // Convert document bytes using LibreOffice with correct source filename and extension
     const convertedBuf = await libreConvertAsync(
       req.file.buffer,
-      outputExt,
+      format,
       undefined,
       { fileName: req.file.originalname }
     );
@@ -39,22 +43,22 @@ async function handleConversion(req, res, outputExt) {
     
     // Choose appropriate Content-Type header based on target format
     let contentType = 'application/octet-stream';
-    if (outputExt === '.pdf') {
+    if (format === 'pdf') {
       contentType = 'application/pdf';
-    } else if (outputExt === '.docx') {
+    } else if (format === 'docx') {
       contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-    } else if (outputExt === '.pptx') {
+    } else if (format === 'pptx') {
       contentType = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
-    } else if (outputExt === '.xlsx') {
+    } else if (format === 'xlsx') {
       contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
     }
 
     res.setHeader('Content-Type', contentType);
-    res.setHeader('Content-Disposition', `attachment; filename="${baseName}${outputExt}"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${baseName}${dotExt}"`);
     res.send(convertedBuf);
     
   } catch (error) {
-    console.error(`Conversion to ${outputExt} failed:`, error);
+    console.error(`Conversion to ${format} failed:`, error);
     res.status(500).json({ 
       error: 'Conversion failed. Please try again.',
       details: error.message
@@ -64,28 +68,28 @@ async function handleConversion(req, res, outputExt) {
 
 // ─── Convert TO PDF Endpoints ─────────────────────────────────────
 app.post('/api/convert/word-to-pdf', upload.single('file'), (req, res) => {
-  handleConversion(req, res, '.pdf');
+  handleConversion(req, res, 'pdf');
 });
 
 app.post('/api/convert/ppt-to-pdf', upload.single('file'), (req, res) => {
-  handleConversion(req, res, '.pdf');
+  handleConversion(req, res, 'pdf');
 });
 
 app.post('/api/convert/excel-to-pdf', upload.single('file'), (req, res) => {
-  handleConversion(req, res, '.pdf');
+  handleConversion(req, res, 'pdf');
 });
 
 // ─── Convert FROM PDF Endpoints ───────────────────────────────────
 app.post('/api/convert/pdf-to-word', upload.single('file'), (req, res) => {
-  handleConversion(req, res, '.docx');
+  handleConversion(req, res, 'docx');
 });
 
 app.post('/api/convert/pdf-to-ppt', upload.single('file'), (req, res) => {
-  handleConversion(req, res, '.pptx');
+  handleConversion(req, res, 'pptx');
 });
 
 app.post('/api/convert/pdf-to-excel', upload.single('file'), (req, res) => {
-  handleConversion(req, res, '.xlsx');
+  handleConversion(req, res, 'xlsx');
 });
 
 // Server listener
