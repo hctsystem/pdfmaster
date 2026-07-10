@@ -3,7 +3,6 @@ const cors = require('cors');
 const multer = require('multer');
 const libre = require('libreoffice-convert');
 const path = require('path');
-const fs = require('fs');
 const { promisify } = require('util');
 
 const libreConvertAsync = promisify(libre.convert);
@@ -11,40 +10,81 @@ const libreConvertAsync = promisify(libre.convert);
 const app = express();
 app.use(cors());
 
-// Configure multer for in-memory storage (good for small/medium files, consider disk storage for large scales)
+// Configure multer for in-memory storage (up to 50MB file size limit)
 const upload = multer({ 
   storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit
+  limits: { fileSize: 50 * 1024 * 1024 }
 });
 
-app.post('/api/convert/word-to-pdf', upload.single('file'), async (req, res) => {
+// Reusable document conversion controller
+async function handleConversion(req, res, outputExt) {
   if (!req.file) {
     return res.status(400).json({ error: 'No file uploaded.' });
   }
 
   try {
-    const ext = '.pdf';
-    // The libreoffice-convert library requires the LibreOffice executable to be in the system PATH.
-    // If LibreOffice is not installed, this will fail.
-    console.log(`Converting ${req.file.originalname} to PDF...`);
+    console.log(`Converting ${req.file.originalname} to ${outputExt}...`);
     
-    const pdfBuf = await libreConvertAsync(req.file.buffer, ext, undefined);
+    // Convert document bytes using LibreOffice
+    const convertedBuf = await libreConvertAsync(req.file.buffer, outputExt, undefined);
     
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${req.file.originalname.split('.')[0]}.pdf"`);
-    res.send(pdfBuf);
+    // Retrieve root filename without the extension
+    const baseName = path.parse(req.file.originalname).name;
+    
+    // Choose appropriate Content-Type header based on target format
+    let contentType = 'application/octet-stream';
+    if (outputExt === '.pdf') {
+      contentType = 'application/pdf';
+    } else if (outputExt === '.docx') {
+      contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    } else if (outputExt === '.pptx') {
+      contentType = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+    } else if (outputExt === '.xlsx') {
+      contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    }
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${baseName}${outputExt}"`);
+    res.send(convertedBuf);
     
   } catch (error) {
-    console.error('Conversion error:', error);
+    console.error(`Conversion to ${outputExt} failed:`, error);
     res.status(500).json({ 
-      error: 'Conversion failed. Make sure LibreOffice is installed on the server.',
+      error: 'Conversion failed. Please try again.',
       details: error.message
     });
   }
+}
+
+// ─── Convert TO PDF Endpoints ─────────────────────────────────────
+app.post('/api/convert/word-to-pdf', upload.single('file'), (req, res) => {
+  handleConversion(req, res, '.pdf');
 });
 
+app.post('/api/convert/ppt-to-pdf', upload.single('file'), (req, res) => {
+  handleConversion(req, res, '.pdf');
+});
+
+app.post('/api/convert/excel-to-pdf', upload.single('file'), (req, res) => {
+  handleConversion(req, res, '.pdf');
+});
+
+// ─── Convert FROM PDF Endpoints ───────────────────────────────────
+app.post('/api/convert/pdf-to-word', upload.single('file'), (req, res) => {
+  handleConversion(req, res, '.docx');
+});
+
+app.post('/api/convert/pdf-to-ppt', upload.single('file'), (req, res) => {
+  handleConversion(req, res, '.pptx');
+});
+
+app.post('/api/convert/pdf-to-excel', upload.single('file'), (req, res) => {
+  handleConversion(req, res, '.xlsx');
+});
+
+// Server listener
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-  console.log(`Conversion server running on http://localhost:${PORT}`);
-  console.log('NOTE: LibreOffice must be installed on this machine for Word conversions to work.');
+  console.log(`PDFMaster conversion server running on http://localhost:${PORT}`);
+  console.log('NOTE: LibreOffice must be installed on the system (or container) for conversions to run.');
 });

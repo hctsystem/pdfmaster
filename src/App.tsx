@@ -22,7 +22,7 @@ import SignTool           from './components/SignTool';
 import ImageToPdfTool     from './components/ImageToPdfTool';
 import RotateTool         from './components/RotateTool';
 import ExtractImagesTool  from './components/ExtractImagesTool';
-import WordToPdfTool      from './components/WordToPdfTool';
+import DocumentConverterTool from './components/DocumentConverterTool';
 import PdfViewerTool      from './components/PdfViewerTool';
 import OcrTool            from './components/OcrTool';
 import EditPdfTool        from './components/EditPdfTool';
@@ -38,7 +38,6 @@ import WatermarkTool      from './components/WatermarkTool';
 import UnlockTool         from './components/UnlockTool';
 import RedactTool         from './components/RedactTool';
 import CompareTool        from './components/CompareTool';
-import ComingSoonTool     from './components/ComingSoonTool';
 import QrToolsPage       from './components/QrToolsPage';
 import DeveloperModal    from './components/DeveloperModal';
 
@@ -721,15 +720,15 @@ export default function App() {
         <Route path="/repair"            element={<ToolWrapper title="Repair PDF"><RepairTool /></ToolWrapper>} />
         {/* Convert to PDF */}
         <Route path="/image-to-pdf"      element={<ToolWrapper title="JPG to PDF"><ImageToPdfTool /></ToolWrapper>} />
-        <Route path="/word-to-pdf"       element={<ToolWrapper title="Word to PDF"><WordToPdfTool /></ToolWrapper>} />
-        <Route path="/ppt-to-pdf"        element={<ToolWrapper title="PowerPoint to PDF"><ComingSoonTool toolName="PowerPoint to PDF" description="Convert .pptx presentations to PDF format with full layout fidelity." /></ToolWrapper>} />
-        <Route path="/excel-to-pdf"      element={<ToolWrapper title="Excel to PDF"><ComingSoonTool toolName="Excel to PDF" description="Convert .xlsx spreadsheets to PDF format, preserving tables and formatting." /></ToolWrapper>} />
+        <Route path="/word-to-pdf"       element={<ToolWrapper title="Word to PDF"><DocumentConverterTool fromName="Word" toName="PDF" endpoint="word-to-pdf" accept=".doc,.docx" acceptDescription="Supports .doc and .docx files" /></ToolWrapper>} />
+        <Route path="/ppt-to-pdf"        element={<ToolWrapper title="PowerPoint to PDF"><DocumentConverterTool fromName="PowerPoint" toName="PDF" endpoint="ppt-to-pdf" accept=".ppt,.pptx" acceptDescription="Supports .ppt and .pptx files" /></ToolWrapper>} />
+        <Route path="/excel-to-pdf"      element={<ToolWrapper title="Excel to PDF"><DocumentConverterTool fromName="Excel" toName="PDF" endpoint="excel-to-pdf" accept=".xls,.xlsx" acceptDescription="Supports .xls and .xlsx files" /></ToolWrapper>} />
         <Route path="/html-to-pdf"       element={<ToolWrapper title="HTML to PDF"><HtmlToPdfTool /></ToolWrapper>} />
         {/* Convert from PDF */}
         <Route path="/pdf-to-jpg"        element={<ToolWrapper title="PDF to JPG"><PdfToJpgTool /></ToolWrapper>} />
-        <Route path="/pdf-to-word"       element={<ToolWrapper title="PDF to Word"><ComingSoonTool toolName="PDF to Word" description="Convert PDF documents to editable .docx files with layout preservation." /></ToolWrapper>} />
-        <Route path="/pdf-to-ppt"        element={<ToolWrapper title="PDF to PowerPoint"><ComingSoonTool toolName="PDF to PowerPoint" description="Convert PDF pages into .pptx presentation slides." /></ToolWrapper>} />
-        <Route path="/pdf-to-excel"      element={<ToolWrapper title="PDF to Excel"><ComingSoonTool toolName="PDF to Excel" description="Extract tables from PDF into editable .xlsx spreadsheets." /></ToolWrapper>} />
+        <Route path="/pdf-to-word"       element={<ToolWrapper title="PDF to Word"><DocumentConverterTool fromName="PDF" toName="Word" endpoint="pdf-to-word" accept=".pdf" acceptDescription="Upload a PDF file to convert to editable Word (.docx) document" /></ToolWrapper>} />
+        <Route path="/pdf-to-ppt"        element={<ToolWrapper title="PDF to PowerPoint"><DocumentConverterTool fromName="PDF" toName="PowerPoint" endpoint="pdf-to-ppt" accept=".pdf" acceptDescription="Upload a PDF file to convert to PowerPoint (.pptx) slides" /></ToolWrapper>} />
+        <Route path="/pdf-to-excel"      element={<ToolWrapper title="PDF to Excel"><DocumentConverterTool fromName="PDF" toName="Excel" endpoint="pdf-to-excel" accept=".pdf" acceptDescription="Upload a PDF file to convert tables to Excel (.xlsx) spreadsheet" /></ToolWrapper>} />
         <Route path="/pdf-to-pdfa"       element={<ToolWrapper title="PDF to PDF/A"><PdfToPdfATool /></ToolWrapper>} />
         {/* Edit PDF */}
         <Route path="/edit-pdf"          element={<ToolWrapper title="Edit PDF"><EditPdfTool /></ToolWrapper>} />
