@@ -32,7 +32,7 @@ export default function DocumentConverterTool({
         // We do a simple ping to see if server is alive.
         // If the server is on Render, it might take ~30s to spin up if cold-started.
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 6000); // 6s timeout
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout for cold start waking up
         
         const response = await fetch(`${apiHost}/api/convert/word-to-pdf`, {
           method: 'POST',
@@ -164,8 +164,8 @@ export default function DocumentConverterTool({
           </span>
         )}
         {serverStatus === 'offline' && (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.75rem', color: 'var(--error)', fontWeight: 700 }}>
-            ● Offline (Connecting Local Fallback)
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.75rem', color: 'var(--warning)', fontWeight: 700 }}>
+            ● Offline or Waking Up
           </span>
         )}
       </div>

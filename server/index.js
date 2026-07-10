@@ -5,7 +5,8 @@ const libre = require('libreoffice-convert');
 const path = require('path');
 const { promisify } = require('util');
 
-const libreConvertAsync = promisify(libre.convert);
+// Promisify convertWithOptions so we can pass fileName extension options
+const libreConvertAsync = promisify(libre.convertWithOptions);
 
 const app = express();
 app.use(cors());
@@ -25,8 +26,13 @@ async function handleConversion(req, res, outputExt) {
   try {
     console.log(`Converting ${req.file.originalname} to ${outputExt}...`);
     
-    // Convert document bytes using LibreOffice
-    const convertedBuf = await libreConvertAsync(req.file.buffer, outputExt, undefined);
+    // Convert document bytes using LibreOffice with correct source filename and extension
+    const convertedBuf = await libreConvertAsync(
+      req.file.buffer,
+      outputExt,
+      undefined,
+      { fileName: req.file.originalname }
+    );
     
     // Retrieve root filename without the extension
     const baseName = path.parse(req.file.originalname).name;
