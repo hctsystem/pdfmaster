@@ -178,6 +178,7 @@ export default function CertificateGeneratorTool() {
     { id: 'company', name: 'Company Name', text: 'ACME CAPITAL CORPORATION', x: 50, y: 31, fontFamily: PRESETS.company.fontFamily, fontSize: PRESETS.company.fontSize, color: PRESETS.company.color, bold: PRESETS.company.bold, italic: PRESETS.company.italic, align: 'center', presetKey: 'company' },
     { id: 'shareholder', name: 'Shareholder Name', text: 'Sarah Jenkins', x: 50, y: 44, fontFamily: PRESETS.shareholder.fontFamily, fontSize: PRESETS.shareholder.fontSize, color: PRESETS.shareholder.color, bold: PRESETS.shareholder.bold, italic: PRESETS.shareholder.italic, align: 'center', presetKey: 'shareholder' },
     { id: 'certNo', name: 'Certificate Number', text: 'N°-094857', x: 80, y: 12, fontFamily: PRESETS.certNo.fontFamily, fontSize: PRESETS.certNo.fontSize, color: PRESETS.certNo.color, bold: PRESETS.certNo.bold, italic: PRESETS.certNo.italic, align: 'right', presetKey: 'certNo' },
+    { id: 'parValue', name: 'Par Value', text: 'Par Value $1.00 Each', x: 20, y: 12, fontFamily: PRESETS.certNo.fontFamily, fontSize: 16, color: '#1e293b', bold: true, italic: false, align: 'left', presetKey: 'certNo' },
     { id: 'shares', name: 'Number of Shares', text: 'Five Thousand (5,000) Shares', x: 50, y: 56, fontFamily: PRESETS.body.fontFamily, fontSize: PRESETS.body.fontSize, color: PRESETS.body.color, bold: PRESETS.body.bold, italic: PRESETS.body.italic, align: 'center', presetKey: 'body' },
     { id: 'dateIssued', name: 'Date Issued', text: 'this 16th day of July, 2026', x: 50, y: 67, fontFamily: PRESETS.body.fontFamily, fontSize: 18, color: '#334155', bold: false, italic: true, align: 'center', presetKey: 'body' },
     { id: 'president', name: 'President Name', text: 'Marcus Aurelius', x: 26.5, y: 84.5, fontFamily: PRESETS.body.fontFamily, fontSize: 18, color: '#1e293b', bold: false, italic: false, align: 'center', presetKey: 'body' },
@@ -189,6 +190,14 @@ export default function CertificateGeneratorTool() {
   ]);
   const [selectedElement, setSelectedElement] = useState<{ id: string; type: 'field' | 'signature' } | null>(null);
   
+  // Custom Date Issued, Shares & Currency States
+  const [issueDay, setIssueDay] = useState('16th');
+  const [issueMonth, setIssueMonth] = useState('July');
+  const [issueYear, setIssueYear] = useState('2026');
+  const [sharesCount, setSharesCount] = useState('Five Thousand (5,000)');
+  const [currencySymbol, setCurrencySymbol] = useState('$');
+  const [parValueAmt, setParValueAmt] = useState('1.00');
+
   // Layout Save/Load State
   const [savedLayouts, setSavedLayouts] = useState<SavedLayout[]>([]);
   const [newLayoutName, setNewLayoutName] = useState<string>('');
@@ -234,6 +243,21 @@ export default function CertificateGeneratorTool() {
       }
     }
   }, []);
+
+  // Sync Date Issued text
+  useEffect(() => {
+    setFields(prev => prev.map(f => f.id === 'dateIssued' ? { ...f, text: `this ${issueDay} day of ${issueMonth}, ${issueYear}` } : f));
+  }, [issueDay, issueMonth, issueYear]);
+
+  // Sync Shares text
+  useEffect(() => {
+    setFields(prev => prev.map(f => f.id === 'shares' ? { ...f, text: `${sharesCount} Shares` } : f));
+  }, [sharesCount]);
+
+  // Sync Par Value text
+  useEffect(() => {
+    setFields(prev => prev.map(f => f.id === 'parValue' ? { ...f, text: `Par Value ${currencySymbol}${parValueAmt} Each` } : f));
+  }, [currencySymbol, parValueAmt]);
 
   // Update container size dynamically on resize
   useEffect(() => {
@@ -808,7 +832,9 @@ export default function CertificateGeneratorTool() {
         {/* Certificate Text Inputs */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
           <h4 style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Field Entries</h4>
-          {fields.map(f => (
+          
+          {/* Generic Text Inputs */}
+          {fields.filter(f => !['shares', 'dateIssued', 'parValue'].includes(f.id)).map(f => (
             <div key={f.id}>
               <label htmlFor={`input-${f.id}`} style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>{f.name}</label>
               <input
@@ -825,6 +851,111 @@ export default function CertificateGeneratorTool() {
               />
             </div>
           ))}
+
+          {/* Custom shares input block */}
+          <div>
+            <label htmlFor="input-shares-count" style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Number of Shares</label>
+            <input
+              id="input-shares-count"
+              type="text"
+              value={sharesCount}
+              onChange={e => setSharesCount(e.target.value)}
+              placeholder="e.g. Five Thousand (5,000)"
+              style={{
+                width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.8125rem',
+                background: 'var(--surface-3)', border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-xs)', color: 'var(--text-main)', outline: 'none'
+              }}
+              aria-label="Number of shares text"
+            />
+          </div>
+
+          {/* Custom par value currency block */}
+          <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: '0.5rem' }}>
+            <div>
+              <label htmlFor="select-currency" style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Currency</label>
+              <select
+                id="select-currency"
+                value={currencySymbol}
+                onChange={e => setCurrencySymbol(e.target.value)}
+                style={{
+                  width: '100%', padding: '0.5rem 0.5rem', fontSize: '0.8125rem',
+                  background: 'var(--surface-3)', border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius-xs)', color: 'var(--text-main)', outline: 'none',
+                  cursor: 'pointer'
+                }}
+                aria-label="Currency symbol select"
+              >
+                <option value="$">$ (USD)</option>
+                <option value="₱">₱ (PHP)</option>
+                <option value="€">€ (EUR)</option>
+                <option value="£">£ (GBP)</option>
+                <option value="¥">¥ (JPY/CNY)</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="input-par-value" style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Par Value Amount</label>
+              <input
+                id="input-par-value"
+                type="text"
+                value={parValueAmt}
+                onChange={e => setParValueAmt(e.target.value)}
+                placeholder="e.g. 1.00"
+                style={{
+                  width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.8125rem',
+                  background: 'var(--surface-3)', border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius-xs)', color: 'var(--text-main)', outline: 'none'
+                }}
+                aria-label="Par value share price"
+              />
+            </div>
+          </div>
+
+          {/* Custom date issued inputs */}
+          <div>
+            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Date Issued</label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr 1fr', gap: '0.375rem' }}>
+              <input
+                type="text"
+                value={issueDay}
+                onChange={e => setIssueDay(e.target.value)}
+                placeholder="Day (16th)"
+                style={{
+                  width: '100%', padding: '0.5rem 0.5rem', fontSize: '0.8125rem',
+                  background: 'var(--surface-3)', border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius-xs)', color: 'var(--text-main)', outline: 'none',
+                  textAlign: 'center'
+                }}
+                aria-label="Issue date day"
+              />
+              <input
+                type="text"
+                value={issueMonth}
+                onChange={e => setIssueMonth(e.target.value)}
+                placeholder="Month (July)"
+                style={{
+                  width: '100%', padding: '0.5rem 0.5rem', fontSize: '0.8125rem',
+                  background: 'var(--surface-3)', border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius-xs)', color: 'var(--text-main)', outline: 'none',
+                  textAlign: 'center'
+                }}
+                aria-label="Issue date month"
+              />
+              <input
+                type="text"
+                value={issueYear}
+                onChange={e => setIssueYear(e.target.value)}
+                placeholder="Year (2026)"
+                style={{
+                  width: '100%', padding: '0.5rem 0.5rem', fontSize: '0.8125rem',
+                  background: 'var(--surface-3)', border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius-xs)', color: 'var(--text-main)', outline: 'none',
+                  textAlign: 'center'
+                }}
+                aria-label="Issue date year"
+              />
+            </div>
+          </div>
         </div>
 
         {/* Signatures Upload */}
