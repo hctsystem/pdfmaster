@@ -178,7 +178,7 @@ export default function CertificateGeneratorTool() {
     { id: 'company', name: 'Company Name', text: 'ACME CAPITAL CORPORATION', x: 50, y: 31, fontFamily: PRESETS.company.fontFamily, fontSize: PRESETS.company.fontSize, color: PRESETS.company.color, bold: PRESETS.company.bold, italic: PRESETS.company.italic, align: 'center', presetKey: 'company' },
     { id: 'shareholder', name: 'Shareholder Name', text: 'Sarah Jenkins', x: 50, y: 44, fontFamily: PRESETS.shareholder.fontFamily, fontSize: PRESETS.shareholder.fontSize, color: PRESETS.shareholder.color, bold: PRESETS.shareholder.bold, italic: PRESETS.shareholder.italic, align: 'center', presetKey: 'shareholder' },
     { id: 'certNo', name: 'Certificate Number', text: 'N°-094857', x: 80, y: 12, fontFamily: PRESETS.certNo.fontFamily, fontSize: PRESETS.certNo.fontSize, color: PRESETS.certNo.color, bold: PRESETS.certNo.bold, italic: PRESETS.certNo.italic, align: 'right', presetKey: 'certNo' },
-    { id: 'parValue', name: 'Par Value', text: 'Par Value $1.00 Each', x: 20, y: 12, fontFamily: PRESETS.certNo.fontFamily, fontSize: 16, color: '#1e293b', bold: true, italic: false, align: 'left', presetKey: 'certNo' },
+    { id: 'parValue', name: 'Par Value', text: '$1.00', x: 20, y: 12, fontFamily: PRESETS.certNo.fontFamily, fontSize: 16, color: '#1e293b', bold: true, italic: false, align: 'left', presetKey: 'certNo' },
     { id: 'shares', name: 'Number of Shares', text: 'Five Thousand (5,000) Shares', x: 50, y: 56, fontFamily: PRESETS.body.fontFamily, fontSize: PRESETS.body.fontSize, color: PRESETS.body.color, bold: PRESETS.body.bold, italic: PRESETS.body.italic, align: 'center', presetKey: 'body' },
     { id: 'dateIssued', name: 'Date Issued', text: 'this 16th day of July, 2026', x: 50, y: 67, fontFamily: PRESETS.body.fontFamily, fontSize: 18, color: '#334155', bold: false, italic: true, align: 'center', presetKey: 'body' },
     { id: 'president', name: 'President Name', text: 'Marcus Aurelius', x: 26.5, y: 84.5, fontFamily: PRESETS.body.fontFamily, fontSize: 18, color: '#1e293b', bold: false, italic: false, align: 'center', presetKey: 'body' },
@@ -194,7 +194,7 @@ export default function CertificateGeneratorTool() {
   const [issueDay, setIssueDay] = useState('16th');
   const [issueMonth, setIssueMonth] = useState('July');
   const [issueYear, setIssueYear] = useState('2026');
-  const [sharesCount, setSharesCount] = useState('Five Thousand (5,000)');
+  const [sharesCount, setSharesCount] = useState('Five Thousand (5,000) Shares');
   const [currencySymbol, setCurrencySymbol] = useState('$');
   const [parValueAmt, setParValueAmt] = useState('1.00');
 
@@ -251,12 +251,12 @@ export default function CertificateGeneratorTool() {
 
   // Sync Shares text
   useEffect(() => {
-    setFields(prev => prev.map(f => f.id === 'shares' ? { ...f, text: `${sharesCount} Shares` } : f));
+    setFields(prev => prev.map(f => f.id === 'shares' ? { ...f, text: sharesCount } : f));
   }, [sharesCount]);
 
   // Sync Par Value text
   useEffect(() => {
-    setFields(prev => prev.map(f => f.id === 'parValue' ? { ...f, text: `Par Value ${currencySymbol}${parValueAmt} Each` } : f));
+    setFields(prev => prev.map(f => f.id === 'parValue' ? { ...f, text: `${currencySymbol}${parValueAmt}` } : f));
   }, [currencySymbol, parValueAmt]);
 
   // Update container size dynamically on resize
